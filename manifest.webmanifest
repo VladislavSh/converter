@@ -1,0 +1,15 @@
+{
+  "name": "Flux — конвертер валют",
+  "short_name": "Flux",
+  "description": "Быстрый конвертер валют и криптовалют с офлайн-режимом",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0B14",
+  "theme_color": "#0B0B14",
+  "lang": "ru",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
