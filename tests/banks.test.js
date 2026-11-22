@@ -73,8 +73,9 @@ test('the cached boards come back only when valid', () => {
   assert.deepEqual(restored.cbu.rates, cbu.rates);
   assert.deepEqual(restored.nbu.rates, [{ code: 'USD', nominal: 1, buy: 11950, sell: 12060 }]);
 
-  assert.deepEqual(restoreBankCache(null), { cbu: null, nbu: null });
-  assert.deepEqual(restoreBankCache('junk'), { cbu: null, nbu: null });
+  const empty = { cbu: null, nbu: null, nbuApi: null, kapitalApi: null };
+  assert.deepEqual(restoreBankCache(null), empty);
+  assert.deepEqual(restoreBankCache('junk'), empty);
   const hostile = restoreBankCache({
     cbu: { ts: 1, rates: [{ code: '<script>', rate: 1 }, { code: 'USD', rate: -1 }, { code: 'RUB', rate: 146, diff: 'x' }] },
     nbu: { ts: 'yesterday', rates: [{ code: 'USD', buy: 1, sell: 2 }] }

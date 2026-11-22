@@ -1,17 +1,28 @@
 // "Rates" tab: pick a source from the list and see its rates — the market
 // rate, the Central Bank, the National Bank and Kapitalbank (their buy and
-// sell prices side by side) or a source of one's own. One
+// sell prices side by side; both also from bank.uz through our rates server)
+// or a source of one's own. One
 // button makes the shown source the one every calculation uses
 // (core/rate-sources.js). The boards are loaded by main.js with the market rates.
 import { RATE_SOURCES } from '../config.js';
 import { shownBankCodes } from '../core/bank-rates.js';
-import { BANK_SOURCES, BUILTIN_SOURCES, KAPITAL, isSourceId, selectSource } from '../core/rate-sources.js';
+import {
+  BANK_SOURCES, BUILTIN_SOURCES, KAPITAL, KAPITAL_API, NBU_API, isSourceId, isTwoSided, selectSource
+} from '../core/rate-sources.js';
 import { formatAmount, formatNumber } from '../core/format.js';
 import { currencyName, isKnownFiat } from '../core/names.js';
 import { badgeHtml } from './badge.js';
 import { $, $$, ICONS, createSheet, escapeHtml } from './dom.js';
 
 const FOCUS_DELAY_MS = 260; // after the sheet's opening transition
+
+// The line under a board's name, and what is said when the board did not load
+const BOARD_TEXTS = {
+  cbu: { sub: 'bankCbuSub', failed: 'bankFailed' },
+  nbu: { sub: 'bankNbuSub', failed: 'bankNbuFailed' },
+  [NBU_API]: { sub: 'bankApiSub', failed: 'bankApiFailed' },
+  [KAPITAL_API]: { sub: 'bankApiSub', failed: 'bankApiFailed' }
+};
 
 export function createBanksView(app, { onSourceChange, onAddSource, onEditSource }) {
   const el = {
@@ -46,7 +57,7 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
 
   const pairHeader = () => `<li class="bank-row bank-row--pair bank-row--head" aria-hidden="true"><span></span><span class="bank-row__value">${escapeHtml(app.t('bankBuy'))}</span><span class="bank-row__value">${escapeHtml(app.t('bankSell'))}</span></li>`;
 
-  function nbuRow(entry) {
+  function pairRow(entry) {
     const cell = value => (value == null ? '—' : money(value));
     return `<li class="bank-row bank-row--pair">${nameCell(entry)}
       <span class="bank-row__value"><b>${cell(entry.buy)}</b></span>
@@ -111,22 +122,24 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
       const board = app.banks[id];
       const status = app.bankStatus[id];
       const link = RATE_SOURCES[id].page;
+      const texts = BOARD_TEXTS[id];
       if (!board) {
-        return { sub: status === 'loading' ? t('bankLoading') : t(id === 'nbu' ? 'bankNbuFailed' : 'bankFailed'), rows: '', hidden: 0, link };
+        return { sub: status === 'loading' ? t('bankLoading') : t(texts.failed), rows: '', hidden: 0, link };
       }
-      const sub = t(id === 'cbu' ? 'bankCbuSub' : 'bankNbuSub', { date: board.date || new Date(board.ts).toLocaleDateString(app.locale()) }) +
+      const sub = t(texts.sub, { date: board.date || new Date(board.ts).toLocaleDateString(app.locale()) }) +
         (status === 'failed' ? ` · ${t('bankStale')}` : '');
       const { codes, hidden } = shownBankCodes(board.rates, app.state.list, expanded);
       const entry = code => board.rates.find(item => item.code === code);
-      const header = id === 'nbu' ? pairHeader() : '';
-      return { sub, rows: header + codes.map(code => (id === 'cbu' ? cbuRow : nbuRow)(entry(code))).join(''), hidden, link };
+      const twoSided = isTwoSided(id);
+      const header = twoSided ? pairHeader() : '';
+      return { sub, rows: header + codes.map(code => (twoSided ? pairRow : cbuRow)(entry(code))).join(''), hidden, link };
     }
     if (id === KAPITAL) {
       const { rates, date } = app.state.kapital;
       const link = RATE_SOURCES.kapital.page;
       if (!rates.length) return { sub: t('srcKapitalEmptyLong'), rows: '', hidden: 0, link };
       const side = value => (value === '' ? null : Number(value));
-      const rows = rates.map(entry => nbuRow({ code: entry.code, nominal: 1, buy: side(entry.buy), sell: side(entry.sell) })).join('');
+      const rows = rates.map(entry => pairRow({ code: entry.code, nominal: 1, buy: side(entry.buy), sell: side(entry.sell) })).join('');
       return { sub: date ? t('srcKapitalSub', { date }) : t('srcKapitalNoDate'), rows: pairHeader() + rows, hidden: 0, link };
     }
     const own = app.state.sources.find(source => source.id === id);

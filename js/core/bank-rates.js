@@ -1,7 +1,9 @@
 // Exchange rates of Uzbek banks for the "Banks" tab: the official rates of the
-// Central Bank (cbu.uz) and the buy/sell board of the National Bank (nbu.uz).
+// Central Bank (cbu.uz), the buy/sell board of the National Bank (nbu.uz) and
+// the buy/sell boards our rates server takes from bank.uz.
 // Everything from the network or from storage passes through these functions.
 // Pure — no DOM, no network.
+import { BANK_SOURCES } from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 
 const MAX_RATES = 150;
@@ -69,6 +71,19 @@ export function parseNbu(payload) {
   return rates.length ? { date, rates } : null;
 }
 
+/**
+ * A board from our rates server (bank.uz behind it):
+ * {ok, bankUpdatedAt: "2026-11-22T20:31:00+05:00", rates: [{code, name, buy, sell}]}.
+ * When bank.uz is down the server keeps the last good rates (ok: false), so
+ * they are still shown — with the date the bank set them, not the date of the call.
+ * @returns {{date: string, rates: {code: string, nominal: number, buy: number|null, sell: number|null}[]}|null}
+ */
+export function parseRatesApi(payload) {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.rates)) return null;
+  const board = parseNbu(payload.rates);
+  return board ? { ...board, date: bankDate(payload.bankUpdatedAt) || bankDate(payload.updatedAt) } : null;
+}
+
 /** A cached bank board read back from storage, checked again; null when unusable. */
 function restoreBoard(raw, kind) {
   if (!raw || typeof raw !== 'object' || !Number.isFinite(raw.ts) || !Array.isArray(raw.rates)) return null;
@@ -88,9 +103,9 @@ function restoreBoard(raw, kind) {
   return rates.length ? { ts: raw.ts, date: bankDate(raw.date), rates } : null;
 }
 
-/** @returns {{cbu: object|null, nbu: object|null}} */
+/** @returns {Record<string, object|null>} a board (or null) for every bank: {cbu, nbu, nbuApi, kapitalApi} */
 export function restoreBankCache(raw) {
-  return { cbu: restoreBoard(raw?.cbu, 'cbu'), nbu: restoreBoard(raw?.nbu, 'nbu') };
+  return Object.fromEntries(BANK_SOURCES.map(bank => [bank, restoreBoard(raw?.[bank], bank)]));
 }
 
 /**

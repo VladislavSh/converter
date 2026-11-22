@@ -1,10 +1,12 @@
 // Entry point: builds the state, creates the views and keeps every rate source
-// fresh — the market rates and both banks, on start and on every refresh.
+// fresh — the market rates and every bank board, on start and on every refresh.
 import { APP_VERSION, RATE_SOURCES, STORAGE_KEYS, TIMING } from './config.js';
 import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
-import { KAPITAL, resolveSource, sourceSummary, sourceTable } from './core/rate-sources.js';
+import {
+  BANK_SOURCES, KAPITAL, KAPITAL_API, NBU_API, resolveSource, sourceSummary, sourceTable
+} from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState, restoreDroppedSum, startOrderInYuan, startWithoutDelivery } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
@@ -25,7 +27,9 @@ import { createPurchaseView } from './ui/purchase.js';
 import { createRatesView } from './ui/rates.js';
 import { createShell } from './ui/shell.js';
 
-const BANKS = ['cbu', 'nbu'];
+// What the built-in sources are called, and the line under a loaded board's name
+const SOURCE_NAMES = { cbu: 'bankCbu', nbu: 'bankNbu', [NBU_API]: 'bankNbuApi', [KAPITAL]: 'bankKapital', [KAPITAL_API]: 'bankKapitalApi' };
+const BOARD_NOTES = { cbu: 'srcCbuNote', nbu: 'srcNbuNote', [NBU_API]: 'srcApiNote', [KAPITAL_API]: 'srcApiNote' };
 
 try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
 
@@ -41,7 +45,7 @@ applyDeepLink(state, location.search, isKnownCurrency);
 restoreDroppedSum(state, Number.isInteger(saved?.v) ? saved.v : null);
 let snapshot = restoreSnapshot(readJson(STORAGE_KEYS.rates));
 let banks = restoreBankCache(readJson(STORAGE_KEYS.banks));
-const bankStatus = { cbu: 'idle', nbu: 'idle' }; // 'loading' | 'ok' | 'failed'
+const bankStatus = Object.fromEntries(BANK_SOURCES.map(bank => [bank, 'idle'])); // 'loading' | 'ok' | 'failed'
 
 // The table calculations run on: the market rates with the chosen source's
 // rates put in, by the buy or the sell prices of a bank that has both. One
@@ -64,7 +68,7 @@ const t = (key, vars) => translate(state.lang, key, vars);
 const app = {
   state,
   get rates() { return snapshot; },
-  /** The bank boards as loaded: {cbu, nbu}, each null until it arrives. */
+  /** The bank boards as loaded: {cbu, nbu, nbuApi, kapitalApi}, each null until it arrives. */
   get banks() { return banks; },
   get bankStatus() { return bankStatus; },
   t,
@@ -81,9 +85,7 @@ const app = {
   /** What a source is called: the market one by the service it comes from. */
   sourceName: id => {
     if (id === 'market') return snapshot?.source || RATE_SOURCES.fiatPrimary.name;
-    if (id === 'cbu') return t('bankCbu');
-    if (id === 'nbu') return t('bankNbu');
-    if (id === KAPITAL) return t('bankKapital');
+    if (Object.hasOwn(SOURCE_NAMES, id)) return t(SOURCE_NAMES[id]);
     return state.sources.find(source => source.id === id)?.name ?? '';
   },
   /** One line under a source's name in the lists: how fresh it is, or what is in it. */
@@ -94,10 +96,10 @@ const app = {
       if (!rates.length) return t('srcKapitalEmpty');
       return date ? t('srcKapitalNote', { date }) : t('srcKapitalNoDate');
     }
-    if (BANKS.includes(id)) {
+    if (BANK_SOURCES.includes(id)) {
       const board = banks[id];
       if (!board) return t(bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
-      return t(id === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
+      return t(BOARD_NOTES[id], { date: board.date });
     }
     const own = state.sources.find(source => source.id === id);
     return own ? sourceSummary(own, localeOf(state.lang), 3) : '';
@@ -200,12 +202,12 @@ async function refreshBank(bank, force) {
 
 let refreshing = false;
 /**
- * Every source at once: the market rates and both banks.
+ * Every source at once: the market rates and every bank board.
  * @param {{manual?: boolean, all?: boolean}} [options]  manual: the refresh
  *   button (reports the outcome); all: reload the banks even if just loaded
  */
 async function refreshRates({ manual = false, all = manual } = {}) {
-  const bankLoads = Promise.all(BANKS.map(bank => refreshBank(bank, all)));
+  const bankLoads = Promise.all(BANK_SOURCES.map(bank => refreshBank(bank, all)));
   if (refreshing) return;
   refreshing = true;
   shell.setRefreshing(true);
@@ -232,8 +234,8 @@ async function refreshRates({ manual = false, all = manual } = {}) {
   if (firstLoad && snapshot) picker.render();
   if (manual) {
     await bankLoads;
-    const banksOk = BANKS.filter(bank => bankStatus[bank] === 'ok').length;
-    app.toast(t(fresh ? 'ratesRefreshedAll' : 'ratesFailed', { n: banksOk, total: BANKS.length }));
+    const banksOk = BANK_SOURCES.filter(bank => bankStatus[bank] === 'ok').length;
+    app.toast(t(fresh ? 'ratesRefreshedAll' : 'ratesFailed', { n: banksOk, total: BANK_SOURCES.length }));
   }
 }
 

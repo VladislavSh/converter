@@ -4,10 +4,13 @@
 //   nbu    — the National Bank's buy and sell prices in its branches;
 //   kapital — Kapitalbank's buy and sell prices, typed in from the bank's page
 //            (its site gives them to no other site, so they cannot be loaded);
+//   nbuApi, kapitalApi — the National Bank's and Kapitalbank's buy and sell
+//            prices from bank.uz, loaded through our own rates server: they
+//            come by themselves and from any country;
 //   sN     — a source of the user's own: a name and the rates of several
 //            currencies in one quote currency ("Exchange office: 1 USD = 12 950,
 //            1 CNY = 1 800 sums").
-// The two banks with buy and sell prices are counted by one side of them:
+// The banks with buy and sell prices are counted by one side of them:
 // "buy" (what the bank pays for a currency) unless "sell" is chosen. The
 // market rate and the Central Bank's rate are one number for both.
 // A source replaces the market rates of the currencies it has; the others keep
@@ -16,13 +19,16 @@ import { evaluate } from './expression.js';
 import { formatAmount, plainNumber } from './format.js';
 import { isCurrencyCode } from './rates.js';
 
-export const BANK_SOURCES = Object.freeze(['cbu', 'nbu']); // loaded from the network
 export const KAPITAL = 'kapital';
-/** The built-in sources after the market one, in the order of the lists. */
-export const BUILTIN_SOURCES = Object.freeze(['cbu', 'nbu', KAPITAL]);
+export const NBU_API = 'nbuApi';
+export const KAPITAL_API = 'kapitalApi';
+/** The sources loaded from the network; each is a board in the Banks tab. */
+export const BANK_SOURCES = Object.freeze(['cbu', 'nbu', NBU_API, KAPITAL_API]);
+/** The built-in sources after the market one, in the order of the lists: each bank's two side by side. */
+export const BUILTIN_SOURCES = Object.freeze(['cbu', 'nbu', NBU_API, KAPITAL, KAPITAL_API]);
 export const RATE_SIDES = Object.freeze(['buy', 'sell']);
 export const DEFAULT_SIDE = 'buy';
-const TWO_SIDED = Object.freeze(['nbu', KAPITAL]);
+const TWO_SIDED = Object.freeze(['nbu', NBU_API, KAPITAL, KAPITAL_API]);
 /** Whether a source has separate buy and sell prices. */
 export const isTwoSided = id => TWO_SIDED.includes(id);
 export const MAX_SOURCES = 12;

@@ -205,15 +205,16 @@ test('flags for the default and popular currencies are bundled', () => {
 
 // ---------- privacy and security ----------
 
-const ALLOWED_HOSTS = [
+const ALLOWED_HOSTS = [...new Set([
   RATE_SOURCES.fiatPrimary.url, RATE_SOURCES.fiatFallback.url, RATE_SOURCES.crypto.url('x'),
-  RATE_SOURCES.cbu.url, RATE_SOURCES.nbu.url
-].map(url => new URL(url).host);
+  RATE_SOURCES.cbu.url, RATE_SOURCES.nbu.url, RATE_SOURCES.nbuApi.url, RATE_SOURCES.kapitalApi.url
+].map(url => new URL(url).host))];
 
 // Pages the app only links to (opened by the user in the browser), never requests
-const LINK_ONLY_HOSTS = [new URL(RATE_SOURCES.kapital.page).host];
+const LINK_ONLY_HOSTS = [RATE_SOURCES.kapital.page, RATE_SOURCES.nbuApi.page, RATE_SOURCES.kapitalApi.page]
+  .map(url => new URL(url).host);
 
-test('the app talks only to the rate APIs and the two banks', () => {
+test('the app talks only to the rate APIs, the banks and our rates server', () => {
   const sources = { 'index.html': html, 'sw.js': sw, ...jsSources, ...Object.fromEntries(walk('css').map(f => [f, read(f)])) };
   for (const [file, source] of Object.entries(sources)) {
     for (const match of source.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {

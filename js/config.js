@@ -1,7 +1,7 @@
 // App-wide constants. APP_VERSION must match VERSION in sw.js and the ?v=
 // query in index.html (tests/project.test.js checks this).
 export const APP_NAME = 'CartRate';
-export const APP_VERSION = '1.24.0';
+export const APP_VERSION = '1.25.0';
 
 export const STORAGE_KEYS = Object.freeze({
   state: 'cartrate_state',
@@ -13,6 +13,8 @@ export const STORAGE_KEYS = Object.freeze({
   clipboard: 'cartrate_clip', // a fingerprint of the clipboard text already offered (never the text)
   clipboardAsk: 'cartrate_clip_ask' // "no": the user declined the clipboard access suggestion
 });
+
+const RATES_API = 'https://212-47-58-193.sslip.io/api/rates';
 
 // The only hosts the app talks to (see the Content-Security-Policy in index.html)
 export const RATE_SOURCES = Object.freeze({
@@ -27,7 +29,12 @@ export const RATE_SOURCES = Object.freeze({
   cbu: { url: 'https://cbu.uz/ru/arkhiv-kursov-valyut/json/', page: 'https://cbu.uz/ru/arkhiv-kursov-valyut/' },
   nbu: { url: 'https://nbu.uz/uz/exchange-rates/json/', page: 'https://nbu.uz/exchange-rates' },
   // Kapitalbank gives its rates to no other site: only a link to its page, the rates are typed in
-  kapital: { page: 'https://kapitalbank.uz/personal/exchange-rate' }
+  kapital: { page: 'https://kapitalbank.uz/personal/exchange-rate' },
+  // Our own rates server (github.com/VladislavSh/CurrecyRater): the buy and sell
+  // boards of the banks on bank.uz, refreshed every 30 minutes. It answers from any
+  // country, and only pages of this site may read it (CORS).
+  nbuApi: { url: `${RATES_API}/nbu`, page: 'https://bank.uz/currency/bank/nbu' },
+  kapitalApi: { url: `${RATES_API}/kapitalbank`, page: 'https://bank.uz/currency/bank/kapitalbank' }
 });
 
 export const TIMING = Object.freeze({
