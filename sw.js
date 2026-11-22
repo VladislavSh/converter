@@ -1,4 +1,4 @@
-const VERSION = 'flux-v4';
+const VERSION = 'flux-v7';
 const SHELL = [
   './',
   'index.html',

@@ -15,11 +15,19 @@
       vConvert: 'Конвертер', vShop: 'Покупка',
       shPrice: 'Цена товара', shShip: 'Доставка', shSvc: 'Процент',
       shFree: 'Бесплатно до, ¥', shMin: 'Минимум, ¥', shFeeTitle: 'Комиссия за оплату иностранной картой',
-      pr200: '3% от 200 ¥', prMin: '3%, мин. 2 ¥', prAll: '3% всегда', prNone: 'Без комиссии',
+      pr200: '3% от 200 ¥', prAll: '3% всегда', prNone: 'Без комиссии',
+      feeNone: 'Комиссия за оплату не берётся.',
+      feeRule: 'Платёжный сервис (Alipay / WeChat Pay) берёт {p} со всей суммы оплаты',
+      feeFree: ', если она больше {lim}; оплата до {lim} включительно — без комиссии',
+      feeMin: ', но не меньше {min}',
+      feePerPay: 'Порог считается для каждой оплаты отдельно.',
+      feeNow: 'Сейчас', feeCalcFree: '{a} ≤ {lim} → комиссии нет', feeCalcMin: 'берётся минимум',
       shMinLbl: 'минимум', shFreeLbl: '0 · до {lim} ¥ бесплатно',
-      shTip: '💡 Если оплатить товары {n} отдельными заказами меньше {lim} ¥ каждый, комиссии не будет — экономия ≈ {save}.',
+      shTip: '💡 Если оплатить товары {n} отдельными заказами до {lim} ¥ каждый, комиссии не будет — экономия ≈ {save}.',
       shBank: 'Комиссия банка, %', shBuf: 'Запас на курс, %', shCard: 'Карта',
       shGoods: 'Товар', shSvcLine: 'Комиссия оплаты', shOrder: 'Итого заказ',
+      dlOff: 'Доставка не учитывается. Включите, чтобы посчитать.',
+      dlOnlyTitle: 'Доставка iPost', dlOnlySub: 'оплачивается отдельно от товара',
       dlTitle: 'Доставка iPost', dlAir: 'Авиа', dlAuto: 'Авто', dlWeight: 'Вес посылки', dlG: 'г', dlKg: 'кг',
       dlAirRate: 'Авиа, $/кг', dlAutoRate: 'Авто, $/кг', dlStep: 'Округление',
       st100: 'до 100 г', st500: 'до 500 г', st1k: 'до 1 кг', st0: 'нет',
@@ -42,11 +50,19 @@
       vConvert: 'Converter', vShop: 'Purchase',
       shPrice: 'Item price', shShip: 'Shipping', shSvc: 'Percent',
       shFree: 'Free below, ¥', shMin: 'Minimum, ¥', shFeeTitle: 'Foreign card payment fee',
-      pr200: '3% from 200 ¥', prMin: '3%, min 2 ¥', prAll: '3% always', prNone: 'No fee',
+      pr200: '3% from 200 ¥', prAll: '3% always', prNone: 'No fee',
+      feeNone: 'No payment fee is charged.',
+      feeRule: 'The payment service (Alipay / WeChat Pay) charges {p} of the whole payment',
+      feeFree: ' if it is over {lim}; payments up to {lim} inclusive are free',
+      feeMin: ', but at least {min}',
+      feePerPay: 'The threshold applies to each payment separately.',
+      feeNow: 'Now', feeCalcFree: '{a} ≤ {lim} → no fee', feeCalcMin: 'minimum applies',
       shMinLbl: 'minimum', shFreeLbl: '0 · free below {lim} ¥',
-      shTip: '💡 Pay for the items as {n} separate orders under {lim} ¥ each and there is no fee — you save ≈ {save}.',
+      shTip: '💡 Pay for the items as {n} separate orders of up to {lim} ¥ each and there is no fee — you save ≈ {save}.',
       shBank: 'Bank fee, %', shBuf: 'Rate buffer, %', shCard: 'Card',
       shGoods: 'Items', shSvcLine: 'Payment fee', shOrder: 'Order total',
+      dlOff: 'Delivery is not included. Turn it on to calculate.',
+      dlOnlyTitle: 'iPost delivery', dlOnlySub: 'paid separately from the items',
       dlTitle: 'iPost delivery', dlAir: 'Air', dlAuto: 'Road', dlWeight: 'Parcel weight', dlG: 'g', dlKg: 'kg',
       dlAirRate: 'Air, $/kg', dlAutoRate: 'Road, $/kg', dlStep: 'Rounding',
       st100: 'to 100 g', st500: 'to 500 g', st1k: 'to 1 kg', st0: 'none',
@@ -76,7 +92,7 @@
   state.shop = Object.assign(
     {
       price: '', priceCur: 'CNY', svcPct: '3', freeBelow: '200', svcMin: '0', card: 'USD', bankPct: '0', bufPct: '2',
-      dlOn: true, dlMethod: 'air', dlWeight: '', dlUnit: 'kg', dlAir: '10', dlAuto: '6', dlStep: '0.1', dlPayCard: false
+      dlOn: false, dlMethod: 'air', dlWeight: '', dlUnit: 'kg', dlAir: '10', dlAuto: '6', dlStep: '0.1', dlPayCard: false
     },
     saved.shop || {}
   );
@@ -92,7 +108,15 @@
     const head = ['USD', 'CNY', 'UZS'].filter(c => state.list.includes(c));
     state.list = head.concat(state.list.filter(c => !head.includes(c)));
   }
-  state.v = 3;
+  // v5: delivery has an on/off switch (off by default), method is a radio: air | auto
+  if ((saved.v || 1) < 5) state.shop.dlOn = false;
+  if (state.shop.dlMethod !== 'air' && state.shop.dlMethod !== 'auto') state.shop.dlMethod = 'air';
+  // v6: "3%, min 2 ¥" preset removed — no such minimum exists (Alipay/WeChat: 3% above 200 ¥, no floor)
+  const n0 = x => parseFloat(String(x).replace(',', '.')) || 0;
+  if ((saved.v || 1) < 6 && n0(state.shop.svcMin) === 2 && n0(state.shop.freeBelow) === 0) {
+    Object.assign(state.shop, { svcPct: '3', freeBelow: '200', svcMin: '0' });
+  }
+  state.v = 6;
   let rates = load(RATES_STORE); // { rates: {CODE: units per 1 USD}, ts, source }
 
   const t = k => (I18N[state.lang] && I18N[state.lang][k]) || I18N.ru[k] || k;
@@ -114,11 +138,11 @@
   };
   const sh = {
     price: $('#sh-price'), cur: $('#sh-cur'), ship: $('#sh-ship'), svc: $('#sh-svc'),
-    free: $('#sh-free'), min: $('#sh-min'), tip: $('#sh-tip'), bank: $('#sh-bank'), buf: $('#sh-buf'), card: $('#sh-card'),
+    free: $('#sh-free'), min: $('#sh-min'), feeExplain: $('#sh-fee-explain'), tip: $('#sh-tip'), bank: $('#sh-bank'), buf: $('#sh-buf'), card: $('#sh-card'),
     rows: $('#sh-break'), topup: $('#sh-topup'), alt: $('#sh-alt'),
     tabs: document.querySelectorAll('.view-tab'),
     convertView: $('#view-convert'), shopView: $('#view-shop'), grand: $('#sh-grand'),
-    dlOn: $('#dl-on'), dlBody: $('#dl-body'), dlMethod: $('#dl-method'), dlWeight: $('#dl-weight'),
+    dlOn: $('#dl-on'), dlBody: $('#dl-body'), dlHint: $('#dl-hint'), dlMethod: $('#dl-method'), dlWeight: $('#dl-weight'),
     dlUnit: $('#dl-unit'), dlAir: $('#dl-air'), dlAuto: $('#dl-auto'), dlStep: $('#dl-step'),
     dlPayCard: $('#dl-paycard'), dlRows: $('#dl-break'), dlAirLbl: $('#dl-air-lbl'), dlAutoLbl: $('#dl-auto-lbl')
   };
@@ -339,7 +363,7 @@
     const price = evaluate(s.price) || 0;
     const dl = updateDelivery();
     const dlInCard = dl.cost > 0 ? convert(dl.cost, 'USD', card) : 0;
-    const dlInTopup = s.dlOn && s.dlPayCard && dlInCard > 0;
+    const dlInTopup = s.dlPayCard && dl.cost > 0 && dlInCard > 0;
     const svcP = pct(s.svcPct), freeBelow = pct(s.freeBelow), svcMin = pct(s.svcMin);
     const bankP = pct(s.bankPct), bufP = pct(s.bufPct);
 
@@ -348,9 +372,11 @@
     document.querySelectorAll('#sh-presets button').forEach(b => b.classList.toggle('is-active', b.dataset.p === key));
 
     // The fee rule is defined in CNY (the platform charges in yuan), per single payment
+    // Alipay / WeChat Pay: a payment of up to the threshold (inclusive) is free,
+    // above it the percent applies to the WHOLE amount, not just the excess.
     const feeCny = cny => {
       if (!(cny > 0) || svcP <= 0) return 0;
-      if (freeBelow > 0 && cny < freeBelow) return 0;
+      if (freeBelow > 0 && cny <= freeBelow) return 0;
       return Math.max(cny * svcP / 100, svcMin);
     };
 
@@ -361,10 +387,32 @@
     const total = base + svc;
     const inCard = total > 0 ? convert(total, cur, card) : null;
 
+    // Plain-language explanation of the current fee rule + this order's calculation
+    const y = v => `${new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(v)} ¥`;
+    let rule;
+    if (svcP <= 0) rule = t('feeNone');
+    else {
+      rule = t('feeRule').replace('{p}', `<b>${svcP}%</b>`);
+      if (freeBelow > 0) rule += t('feeFree').replace(/\{lim\}/g, `<b>${y(freeBelow)}</b>`);
+      if (svcMin > 0) rule += t('feeMin').replace('{min}', `<b>${y(svcMin)}</b>`);
+      rule += '. ' + t('feePerPay');
+    }
+    let calc = '';
+    if (baseCny > 0 && svcP > 0) {
+      if (svcCny === 0) calc = t('feeCalcFree').replace('{a}', y(baseCny)).replace('{lim}', y(freeBelow));
+      else {
+        const raw = baseCny * svcP / 100;
+        calc = `${y(baseCny)}${freeBelow > 0 ? ` > ${y(freeBelow)}` : ''} → ${svcP}% × ${y(baseCny)} = ${y(raw)}`;
+        if (svcMin > 0 && raw < svcMin) calc += ` < ${y(svcMin)} → ${t('feeCalcMin')} ${y(svcMin)}`;
+      }
+      calc = `<span class="calc">${t('feeNow')}: ${calc}</span>`;
+    }
+    sh.feeExplain.innerHTML = rule + calc;
+
     // Splitting tip: N separate payments, each under the free threshold
     sh.tip.hidden = true;
-    if (svcCny > 0 && freeBelow > 0 && baseCny >= freeBelow) {
-      const parts = Math.ceil(baseCny / (freeBelow - 0.01));
+    if (svcCny > 0 && freeBelow > 0 && baseCny > freeBelow) {
+      const parts = Math.ceil(baseCny / freeBelow);
       const saved = convert(svcCny, 'CNY', card);
       if (saved != null) {
         sh.tip.innerHTML = t('shTip')
@@ -382,17 +430,25 @@
     if (cnyUzs != null) rateBits.push(`1 CNY = ${money(cnyUzs, 'CNY')} UZS`);
 
     sh.grand.hidden = true;
-    if (inCard == null) {
+    const hasGoods = inCard != null && inCard > 0;
+    if (!hasGoods && !(dl.cost > 0)) {
       sh.rows.innerHTML = '';
       sh.topup.textContent = '—';
       sh.alt.textContent = rateBits.join(' · ');
       return;
     }
 
-    const bankFee = inCard * bankP / 100;
-    const goodsCharged = inCard + bankFee;
-    const charged = goodsCharged + (dlInTopup ? dlInCard : 0);
-    const withBuf = charged * (1 + bufP / 100);
+    // Goods: converted at the payment-system rate → bank fee → buffer for rate drift
+    const goodsInCard = hasGoods ? inCard : 0;
+    const bankFee = goodsInCard * bankP / 100;
+    const goodsCharged = goodsInCard + bankFee;
+    const goodsBuf = goodsCharged * bufP / 100;
+    // Delivery: iPost bills a fixed USD amount — a USD card pays it as is,
+    // a UZS card converts it, so only then the rate buffer applies.
+    const dlPart = dlInTopup ? dlInCard : 0;
+    const dlBuf = dlInTopup && card !== 'USD' ? dlPart * bufP / 100 : 0;
+    const charged = goodsCharged + dlPart;
+    const withBuf = charged + goodsBuf + dlBuf;
     const step = card === 'UZS' ? 1000 : 1;
     const topup = Math.ceil(withBuf / step - 1e-9) * step;
 
@@ -400,32 +456,41 @@
     const row = (label, val, strong) =>
       rows.push(`<div class="rrow${strong ? ' is-strong' : ''}"><span>${label}</span><b>${val}</b></div>`);
 
-    row(t('shGoods'), `${fmt(base, cur)} ${cur}`);
-    if (svc > 0) {
-      const isMin = svcMin > 0 && svcCny <= svcMin + 1e-9;
-      row(`${t('shSvcLine')} (${isMin ? t('shMinLbl') : svcP + '%'})`, `+${fmt(svc, cur)} ${cur}`);
-    } else if (svcP > 0 && freeBelow > 0 && base > 0) {
-      row(`${t('shSvcLine')}`, t('shFreeLbl').replace('{lim}', fmt(freeBelow, 'UZS')));
+    if (hasGoods) {
+      row(t('shGoods'), `${fmt(base, cur)} ${cur}`);
+      if (svc > 0) {
+        const isMin = svcMin > 0 && svcCny <= svcMin + 1e-9;
+        row(`${t('shSvcLine')} (${isMin ? t('shMinLbl') : svcP + '%'})`, `+${fmt(svc, cur)} ${cur}`);
+      } else if (svcP > 0 && freeBelow > 0) {
+        row(`${t('shSvcLine')}`, t('shFreeLbl').replace('{lim}', fmt(freeBelow, 'UZS')));
+      }
+      row(t('shOrder'), `${fmt(total, cur)} ${cur}${cur !== card ? ` ≈ ${fmt(inCard, card)} ${card}` : ''}`, true);
+      if (bankP > 0) row(`${t('shBankLine')} (${bankP}%)`, `+${fmt(bankFee, card)} ${card}`);
     }
-    row(t('shOrder'), `${fmt(total, cur)} ${cur}${cur !== card ? ` ≈ ${fmt(inCard, card)} ${card}` : ''}`, true);
-    if (bankP > 0) row(`${t('shBankLine')} (${bankP}%)`, `+${fmt(bankFee, card)} ${card}`);
-    if (dlInTopup) row(`${t('dlTitle')} (${t(s.dlMethod === 'air' ? 'dlAir' : 'dlAuto').toLowerCase()})`, `+${fmt(dlInCard, card)} ${card}`);
-    row(t('shCharged'), `≈ ${fmt(charged, card)} ${card}`, true);
-    if (bufP > 0) row(`${t('shBufLine')} (${bufP}%)`, `+${fmt(withBuf - charged, card)} ${card}`);
+    if (dlInTopup) row(`${t('dlTitle')} (${t(s.dlMethod === 'air' ? 'dlAir' : 'dlAuto').toLowerCase()})`, `+${fmt(dlPart, card)} ${card}`);
 
+    if (hasGoods || dlInTopup) {
+      row(t('shCharged'), `≈ ${fmt(charged, card)} ${card}`, true);
+      if (goodsBuf + dlBuf > 0) row(`${t('shBufLine')} (${bufP}%)`, `+${fmt(goodsBuf + dlBuf, card)} ${card}`);
+      sh.topup.textContent = `${fmt(topup, card)} ${card}`;
+      const altV = convert(charged, card, alt);
+      sh.alt.textContent = (altV != null ? [`≈ ${fmt(altV, alt)} ${alt}`] : []).concat(rateBits).join(' · ');
+    } else {
+      // only delivery, paid separately: nothing to top up on the card
+      sh.topup.textContent = '—';
+      sh.alt.textContent = rateBits.join(' · ');
+    }
     sh.rows.innerHTML = rows.join('');
-    sh.topup.textContent = `${fmt(topup, card)} ${card}`;
-    const altV = convert(charged, card, alt);
-    const bits = altV != null ? [`≈ ${fmt(altV, alt)} ${alt}`] : [];
-    sh.alt.textContent = bits.concat(rateBits).join(' · ');
 
     // Whole purchase incl. delivery paid separately
-    if (s.dlOn && dl.cost > 0 && !dlInTopup) {
-      const allUsd = (convert(goodsCharged, card, 'USD') || 0) + dl.cost;
+    if (dl.cost > 0 && !dlInTopup) {
+      const goodsUsd = hasGoods ? (convert(goodsCharged, card, 'USD') || 0) : 0;
+      const allUsd = goodsUsd + dl.cost;
       const allUzs = convert(allUsd, 'USD', 'UZS');
+      const title = hasGoods ? t('grandTitle') : t('dlOnlyTitle');
       sh.grand.innerHTML =
-        `<div class="grand__row"><span>${t('grandTitle')}</span><b>${fmt(allUsd, 'USD')} USD</b></div>` +
-        `<div class="grand__sub">${allUzs != null ? `≈ ${fmt(allUzs, 'UZS')} UZS · ` : ''}${t('grandSub').replace('{dl}', `${fmt(dl.cost, 'USD')} $`)}</div>`;
+        `<div class="grand__row"><span>${title}</span><b>${fmt(allUsd, 'USD')} USD</b></div>` +
+        `<div class="grand__sub">${allUzs != null ? `≈ ${fmt(allUzs, 'UZS')} UZS · ` : ''}${hasGoods ? t('grandSub').replace('{dl}', `${fmt(dl.cost, 'USD')} $`) : t('dlOnlySub')}</div>`;
       sh.grand.hidden = false;
     }
   }
@@ -437,7 +502,9 @@
     const perKg = n => `${money(n, 'USD')} $/${t('dlKg')}`;
     sh.dlAirLbl.textContent = perKg(air);
     sh.dlAutoLbl.textContent = perKg(auto);
+    sh.dlOn.checked = !!s.dlOn;
     sh.dlBody.hidden = !s.dlOn;
+    sh.dlHint.hidden = !!s.dlOn;
     if (!s.dlOn) { sh.dlRows.innerHTML = ''; return { cost: 0 }; }
 
     const w = evaluate(s.dlWeight) || 0;
@@ -757,19 +824,36 @@
     updateShop();
   });
   // iPost delivery controls
-  const segBind = (box, key) => {
-    const sync = () => box.querySelectorAll('button').forEach(x => x.classList.toggle('is-active', x.dataset.val === state.shop[key]));
+  // optional = clicking the selected button clears the choice
+  const segBind = (box, key, optional = false) => {
+    const sync = () => box.querySelectorAll('button').forEach(x => {
+      const on = x.dataset.val === state.shop[key];
+      x.classList.toggle('is-active', on);
+      if (optional) x.setAttribute('aria-pressed', on);
+    });
     sync();
     box.addEventListener('click', e => {
       const b = e.target.closest('button[data-val]');
       if (!b) return;
-      state.shop[key] = b.dataset.val;
+      state.shop[key] = optional && state.shop[key] === b.dataset.val ? '' : b.dataset.val;
       sync(); persist(); updateShop();
     });
   };
   segBind(sh.dlMethod, 'dlMethod');
   segBind(sh.dlUnit, 'dlUnit');
-  [['dlOn', 'dlOn'], ['dlPayCard', 'dlPayCard']].forEach(([elKey, key]) => {
+  // Delivery switch: turning it off clears the delivery so nothing of it is counted
+  sh.dlOn.addEventListener('change', () => {
+    state.shop.dlOn = sh.dlOn.checked;
+    if (!sh.dlOn.checked) {
+      state.shop.dlWeight = '';
+      state.shop.dlPayCard = false;
+      sh.dlWeight.value = '';
+      sh.dlPayCard.checked = false;
+    }
+    persist();
+    updateShop();
+  });
+  [['dlPayCard', 'dlPayCard']].forEach(([elKey, key]) => {
     sh[elKey].checked = !!state.shop[key];
     sh[elKey].addEventListener('change', () => { state.shop[key] = sh[elKey].checked; persist(); updateShop(); });
   });
