@@ -1,6 +1,7 @@
-// Installing the app to the home screen. Chrome and Edge offer it themselves
-// (the page gets an install prompt); Safari on iPhone and some other browsers
-// never do, so there the user is shown where the menu item is.
+// Installing the app to the home screen. Chrome and Edge open their own
+// install dialog in one tap (see js/install-early.js and ui/shell.js); Safari
+// on iPhone and Firefox never let a page do that, so there the user is shown
+// where the menu item is.
 
 /**
  * Which set of instructions fits this device.
@@ -17,8 +18,8 @@ export function installPlatform({ userAgent = '', platform = '', maxTouchPoints 
 /** Translation keys of the steps, in order. */
 export const INSTALL_STEPS = Object.freeze({
   ios: ['installIos1', 'installIos2', 'installIos3'],
-  android: ['installAndroid1', 'installAndroid2'],
-  desktop: ['installDesktop1', 'installDesktop2']
+  android: ['installAndroid1', 'installAndroid2', 'installAlready'],
+  desktop: ['installDesktop1', 'installDesktop2', 'installAlready']
 });
 
 /**

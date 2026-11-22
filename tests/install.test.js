@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { INSTALL_STEPS, installPlatform, isInstalled } from '../js/core/install.js';
 import { MESSAGES } from '../js/i18n.js';
 
@@ -59,4 +60,38 @@ test('the manifest and the page offer icons phones can use', () => {
   const touch = readFileSync(join(ROOT, 'index.html'), 'utf8').match(/rel="apple-touch-icon" href="([^"]+)"/)[1];
   assert.match(touch, /\.png$/);
   assert.ok(existsSync(join(ROOT, touch)));
+});
+
+test('the browser\'s install offer is caught before the app loads and kept for the button', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const early = html.indexOf('js/install-early.js');
+  assert.ok(early > 0 && early < html.indexOf('</head>'), 'loaded in <head>');
+  assert.ok(early < html.indexOf('js/main.js'), 'before the app modules');
+
+  const handlers = {};
+  const sent = [];
+  const win = {
+    addEventListener: (type, handler) => { handlers[type] = handler; },
+    dispatchEvent: event => sent.push(event.type)
+  };
+  vm.runInNewContext(readFileSync(join(ROOT, 'js/install-early.js'), 'utf8'), { window: win, Event: class { constructor(type) { this.type = type; } } });
+
+  let prevented = false;
+  const offer = { preventDefault: () => { prevented = true; }, prompt: () => {} };
+  handlers.beforeinstallprompt(offer);
+  assert.equal(prevented, true, 'no browser banner: the button decides when to ask');
+  assert.equal(win.cartrateInstallPrompt, offer);
+  assert.deepEqual(sent, ['cartrate:installable'], 'a tap that is already waiting gets it at once');
+
+  const shell = readFileSync(join(ROOT, 'js/ui/shell.js'), 'utf8');
+  assert.ok(shell.includes(`'${sent[0]}'`), 'the button listens for the same event name');
+});
+
+test('the manifest lets Chrome install the app and spot an installed copy', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'manifest.webmanifest'), 'utf8'));
+  assert.notEqual(manifest.prefer_related_applications, true, 'true would stop Chrome from offering installation');
+  const self = manifest.related_applications.find(app => app.platform === 'webapp');
+  assert.match(self.url, /^https:\/\/[^/]+\/converter\/manifest\.webmanifest$/);
+  assert.equal(manifest.display, 'standalone');
+  assert.ok(manifest.name && manifest.short_name && manifest.start_url);
 });

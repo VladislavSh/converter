@@ -6,6 +6,10 @@ import { $, $$, createSheet } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
 const SPLASH_FADE_MS = 700;
+const INSTALLABLE_EVENT = 'cartrate:installable'; // sent by js/install-early.js
+// How long a tap on "Install" waits for the browser's offer. A browser lets a
+// page open its install dialog only within about 5 s of the tap.
+const PROMPT_WAIT_MS = 3000;
 
 export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) {
   const el = {
@@ -116,12 +120,31 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   }));
 
   // ---------- installing to the home screen ----------
-  // "Install" is always there in a browser tab. Where the browser offers
-  // installation (Chrome, Edge) the button opens its dialog; elsewhere (Safari
-  // on iPhone, Firefox) it shows where the menu item is.
+  // Chrome, Edge and other Chromium browsers: the button opens the browser's
+  // own install dialog. The steps by hand are shown only where a page cannot
+  // ask for that (Safari on iPhone, Firefox) or the browser declined to.
   const platform = installPlatform(navigator);
   const installGuide = createSheet($('#install-sheet'), $('#app'));
-  let installPrompt = null;
+  const promptSupported = 'onbeforeinstallprompt' in window;
+  let installing = false;
+
+  /**
+   * The browser's install offer, caught by js/install-early.js. Right after the
+   * page opens it may still be on its way, so it is waited for a moment.
+   */
+  function installOffer() {
+    if (window.cartrateInstallPrompt || !promptSupported) return Promise.resolve(window.cartrateInstallPrompt ?? null);
+    app.toast(app.t('installWait'));
+    return new Promise(resolve => {
+      const done = () => {
+        clearTimeout(timer);
+        window.removeEventListener(INSTALLABLE_EVENT, done);
+        resolve(window.cartrateInstallPrompt ?? null);
+      };
+      const timer = setTimeout(done, PROMPT_WAIT_MS);
+      window.addEventListener(INSTALLABLE_EVENT, done);
+    });
+  }
 
   function renderInstallSteps() {
     el.installSteps.replaceChildren(...INSTALL_STEPS[platform].map(key => {
@@ -137,24 +160,38 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     iosStandalone: navigator.standalone
   }));
 
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault(); // no browser banner: the button asks when the user wants it
-    installPrompt = event;
-  });
+  // Chrome on Android also knows when this app is already on the home screen
+  // (manifest "related_applications"): then there is nothing to install.
+  navigator.getInstalledRelatedApps?.()
+    .then(apps => { if (apps.length) showInstall(false); })
+    .catch(() => {});
+
   window.addEventListener('appinstalled', () => {
-    installPrompt = null;
+    window.cartrateInstallPrompt = null;
     showInstall(false);
     installGuide.close();
   });
   el.installButtons.forEach(button => button.addEventListener('click', async () => {
-    if (!installPrompt) {
-      installGuide.open();
-      return;
+    if (installing) return;
+    installing = true;
+    try {
+      const offer = await installOffer();
+      if (!offer) {
+        installGuide.open();
+        return;
+      }
+      window.cartrateInstallPrompt = null; // an offer can be shown only once
+      try {
+        await offer.prompt();
+      } catch {
+        installGuide.open(); // the browser refused to show its dialog
+        return;
+      }
+      const choice = await offer.userChoice.catch(() => null);
+      if (choice?.outcome === 'accepted') showInstall(false);
+    } finally {
+      installing = false;
     }
-    const prompt = installPrompt;
-    installPrompt = null; // a prompt can be shown only once
-    prompt.prompt();
-    await prompt.userChoice.catch(() => {});
   }));
 
   return { applyTheme, applyTexts, setStatus, setView, setRefreshing, hideSplash };
