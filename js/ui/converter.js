@@ -13,7 +13,7 @@ const HERO_SIZES = [[7, 'xl'], [10, 'l'], [14, 'm'], [Infinity, 's']];
 const RESULT_SIZES = [[11, 'l'], [15, 'm'], [Infinity, 's']];
 const sizeFor = (length, sizes) => sizes.find(([max]) => length <= max)[1];
 
-export function createConverterView(app, { onEditList }) {
+export function createConverterView(app, { onEditList, keypad }) {
   const el = {
     hero: $('#hero'),
     tabs: $('#src-tabs'),
@@ -21,7 +21,6 @@ export function createConverterView(app, { onEditList }) {
     input: $('#amount'),
     paste: $('#amount-paste'),
     expr: $('#amount-expr'),
-    ops: $('#amount-ops'),
     results: $('#results'),
     edit: $('#manage-btn'),
     share: $('#conv-share')
@@ -223,22 +222,11 @@ export function createConverterView(app, { onEditList }) {
     commitInput();
   });
 
-  // --- operator keys: phone numeric keyboards have no + − × ÷ ---
-  const keepFocus = event => { if (event.target.closest('[data-op]')) event.preventDefault(); };
-  el.ops.addEventListener('pointerdown', keepFocus);
-  el.ops.addEventListener('mousedown', keepFocus);
-  el.ops.addEventListener('click', event => {
-    const key = event.target.closest('[data-op]');
-    if (!key) return;
-    if (document.activeElement !== el.input) el.input.focus();
-    // Focusing selects the whole amount so that typing replaces it. An operator
-    // continues the amount instead, so it goes after it.
-    const { value, selectionStart, selectionEnd } = el.input;
-    if (value && selectionStart === 0 && selectionEnd === value.length) {
-      el.input.setSelectionRange(value.length, value.length);
-    }
-    el.input.setRangeText(key.dataset.op, el.input.selectionStart, el.input.selectionEnd, 'end');
-    commitInput();
+  // --- on touch screens the calculator keypad types here instead of the phone's keyboard ---
+  keypad.attach(el.input, {
+    label: () => app.t('amountLabel', { code: app.state.base }),
+    format: value => format(value, app.state.base),
+    plain: value => formatAmount(value, app.state.base, { plain: true })
   });
 
   // --- results: tap a row to type in that currency, or copy its value ---

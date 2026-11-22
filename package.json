@@ -1,6 +1,6 @@
 {
   "name": "cartrate",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "description": "Currency converter and purchase calculator (static PWA, no build step)",

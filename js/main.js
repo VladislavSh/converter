@@ -12,6 +12,7 @@ import { registerServiceWorker } from './services/sw-update.js';
 import { createUrlSync, currentLink } from './services/url-sync.js';
 import { installFlagFallback } from './ui/badge.js';
 import { createConverterView } from './ui/converter.js';
+import { createKeypad } from './ui/keypad.js';
 import { $, createToast, shareText } from './ui/dom.js';
 import { createPickerView } from './ui/picker.js';
 import { createPurchaseView } from './ui/purchase.js';
@@ -73,6 +74,7 @@ const app = {
 };
 
 installFlagFallback();
+const keypad = createKeypad(app);
 const shell = createShell(app, {
   onRefresh: () => refreshRates({ manual: true }),
   onLanguageChange: renderAll,
@@ -83,8 +85,8 @@ const shell = createShell(app, {
   }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
-const converter = createConverterView(app, { onEditList: () => picker.open() });
-const purchase = createPurchaseView(app);
+const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
+const purchase = createPurchaseView(app, { keypad });
 const customRates = createRatesView(app, { onChange: renderAll });
 
 function renderAll() {

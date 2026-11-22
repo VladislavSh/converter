@@ -9,7 +9,7 @@ import { $, $$, copyText, escapeHtml, readClipboardText } from './dom.js';
 
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
 
-export function createPurchaseView(app) {
+export function createPurchaseView(app, { keypad }) {
   const el = {
     price: $('#sh-price'),
     paste: $('#sh-paste'),
@@ -223,6 +223,8 @@ export function createPurchaseView(app) {
   // ---------- events ----------
 
   for (const [input, key] of TEXT_FIELDS) {
+    // On touch screens these fields are typed with the calculator keypad
+    keypad.attach(input, key === 'price' ? { label: () => `${app.t('shPrice')}, ${shop().priceCur}` } : {});
     input.value = shop()[key];
     input.addEventListener('input', () => {
       const clean = sanitizeExpression(input.value);

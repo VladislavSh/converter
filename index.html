@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.9.1"></script>
-  <script src="js/boot-guard.js?v=1.9.1"></script>
-  <script src="js/install-early.js?v=1.9.1"></script>
+  <script src="js/theme-init.js?v=1.10.0"></script>
+  <script src="js/boot-guard.js?v=1.10.0"></script>
+  <script src="js/install-early.js?v=1.10.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.9.1">
+  <link rel="stylesheet" href="css/style.css?v=1.10.0">
 </head>
 <body>
 
@@ -99,12 +99,6 @@
         </div>
         <input class="hero__input" id="amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="0">
         <div class="hero__expr" id="amount-expr" aria-live="polite"></div>
-        <div class="hero__ops" id="amount-ops" role="group" data-i18n-aria="opsLabel" aria-label="Знаки действий">
-          <button type="button" class="op" data-op="+" aria-label="+">+</button>
-          <button type="button" class="op" data-op="-" aria-label="−">−</button>
-          <button type="button" class="op" data-op="×" aria-label="×">×</button>
-          <button type="button" class="op" data-op="÷" aria-label="÷">÷</button>
-        </div>
       </div>
 
       <ul class="results" id="results"></ul>
@@ -381,8 +375,41 @@
   </div>
 </div>
 
+<!-- Calculator keypad for amount fields on touch screens (ui/keypad.js) -->
+<div class="keypad" id="keypad" aria-hidden="true">
+  <div class="keypad__head">
+    <div class="keypad__info">
+      <span class="keypad__label" id="keypad-label"></span>
+      <span class="keypad__preview" id="keypad-preview" aria-live="polite"></span>
+    </div>
+    <button type="button" class="keypad__done" data-key="done" data-i18n="keypadDone">Готово</button>
+  </div>
+  <div class="keypad__keys" role="group" data-i18n-aria="keypadLabel" aria-label="Клавиатура калькулятора">
+      <button type="button" class="key key--fn" data-key="clear" data-i18n-aria="keyClear" aria-label="Очистить всё">C</button>
+      <button type="button" class="key key--fn" data-key="paren" data-i18n-aria="keyParen" aria-label="Скобка">( )</button>
+      <button type="button" class="key key--fn" data-key="%" data-i18n-aria="keyPercent" aria-label="Процент">%</button>
+      <button type="button" class="key key--op" data-key="÷" data-i18n-aria="keyDivide" aria-label="Разделить">÷</button>
+      <button type="button" class="key" data-key="7">7</button>
+      <button type="button" class="key" data-key="8">8</button>
+      <button type="button" class="key" data-key="9">9</button>
+      <button type="button" class="key key--op" data-key="×" data-i18n-aria="keyMultiply" aria-label="Умножить">×</button>
+      <button type="button" class="key" data-key="4">4</button>
+      <button type="button" class="key" data-key="5">5</button>
+      <button type="button" class="key" data-key="6">6</button>
+      <button type="button" class="key key--op" data-key="-" data-i18n-aria="keyMinus" aria-label="Минус">−</button>
+      <button type="button" class="key" data-key="1">1</button>
+      <button type="button" class="key" data-key="2">2</button>
+      <button type="button" class="key" data-key="3">3</button>
+      <button type="button" class="key key--op" data-key="+" data-i18n-aria="keyPlus" aria-label="Плюс">+</button>
+      <button type="button" class="key" data-key="dot" data-i18n-aria="keyDecimal" aria-label="Дробная часть">,</button>
+      <button type="button" class="key" data-key="0">0</button>
+      <button type="button" class="key key--fn" data-key="back" data-i18n-aria="keyBack" aria-label="Стереть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6-7 6-7Z"/><path d="m12 9 6 6M18 9l-6 6"/></svg></button>
+      <button type="button" class="key key--eq" data-key="equals" data-i18n-aria="keyEquals" aria-label="Посчитать">=</button>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.9.1"></script>
+<script type="module" src="js/main.js?v=1.10.0"></script>
 </body>
 </html>

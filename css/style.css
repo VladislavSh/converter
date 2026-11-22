@@ -207,15 +207,6 @@ h1, h2, p { margin: 0; }
 .hero.is-switched .hero__input, .hero.is-switched .hero__name { animation: rise .3s var(--ease) both; }
 .hero__expr { min-height: 22px; font-size: 15px; font-weight: 700; color: #B9F3FF; font-variant-numeric: tabular-nums; }
 
-/* Operator keys: phone numeric keyboards have no + − × ÷ */
-.hero__ops { display: none; gap: 8px; margin-top: 10px; }
-@media (pointer: coarse) { .hero__ops { display: flex; } }
-.op {
-  flex: 1; height: 42px; border-radius: 14px; font-size: 21px; font-weight: 600; line-height: 1;
-  color: #fff; background: rgba(255, 255, 255, .14); transition: background .15s;
-}
-.op:active { background: rgba(255, 255, 255, .3); }
-
 /* ---------- Converter: the results ---------- */
 .results {
   list-style: none; margin: 12px 0 0; padding: 2px 0; border-radius: 24px;
@@ -537,6 +528,46 @@ h1, h2, p { margin: 0; }
 .pick__move button:hover:not(:disabled) { color: var(--text); }
 .pick__move button:disabled { opacity: .35; cursor: default; }
 .pick__move svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Calculator keypad ---------- */
+.keypad {
+  position: fixed; left: 50%; bottom: 0; z-index: 40; width: 100%; max-width: 560px;
+  padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+  background: var(--sheet); border: 1px solid var(--card-border); border-bottom: 0; border-radius: 24px 24px 0 0;
+  box-shadow: 0 -18px 50px -18px rgba(0, 0, 0, .55);
+  transform: translate(-50%, 100%); visibility: hidden;
+  transition: transform .3s var(--ease), visibility 0s .3s;
+}
+.keypad.is-open { transform: translate(-50%, 0); visibility: visible; transition: transform .3s var(--ease); }
+.keypad__head { display: flex; align-items: center; gap: 12px; min-height: 38px; margin: 0 4px 10px; }
+.keypad__info { flex: 1; min-width: 0; display: grid; }
+.keypad__label, .keypad__preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.keypad__label { font-size: 12px; font-weight: 700; color: var(--text-2); letter-spacing: .02em; }
+.keypad__preview { min-height: 1.3em; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.keypad__preview.is-error { color: #F2637E; animation: keypad-shake .35s; }
+@keyframes keypad-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.keypad__done {
+  height: 38px; padding: 0 16px; border-radius: 12px; flex: none;
+  background: var(--input-bg); font-size: 14px; font-weight: 800; touch-action: manipulation;
+}
+.keypad__keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.key {
+  height: clamp(46px, 7dvh, 58px); border-radius: 16px; display: grid; place-items: center;
+  background: var(--input-bg); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease), background .15s;
+}
+.key:active { transform: scale(.94); background: var(--card-hover); }
+.key--fn { color: var(--text-2); font-size: 18px; }
+.key--op { color: var(--accent-1); background: rgba(124, 92, 255, .14); font-size: 25px; }
+:root[data-theme="dark"] .key--op { color: #A996FF; }
+.key--op:active { background: rgba(124, 92, 255, .26); }
+.key--eq { color: #fff; background: var(--accent); font-size: 26px; }
+.key--eq:active { background: var(--accent); filter: brightness(1.1); }
+.key svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* nothing on the page stays hidden behind the open keypad */
+body.has-keypad .app { padding-bottom: calc(var(--keypad-h, 380px) + 16px); }
+body.has-keypad .toast { bottom: calc(var(--keypad-h, 380px) + 12px); }
 
 /* ---------- Toast ---------- */
 .toast {

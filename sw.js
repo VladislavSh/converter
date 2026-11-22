@@ -1,7 +1,7 @@
 // Offline support. Only same-origin files are cached; the rate APIs always go
 // to the network (the app keeps the last rates itself). No third-party hosts.
 const PREFIX = 'cartrate-';
-const VERSION = `${PREFIX}1.9.1`; // keep in sync with APP_VERSION in js/config.js
+const VERSION = `${PREFIX}1.10.0`; // keep in sync with APP_VERSION in js/config.js
 const FLAGS = `${PREFIX}flags`; // flag images never change, so this cache survives releases
 const SHELL = [
   './',
@@ -14,6 +14,7 @@ const SHELL = [
   'js/core/deep-link.js',
   'js/core/expression.js',
   'js/core/format.js',
+  'js/core/keypad.js',
   'js/core/install.js',
   'js/core/names.js',
   'js/core/pasted-amount.js',
@@ -33,6 +34,7 @@ const SHELL = [
   'js/ui/badge.js',
   'js/ui/converter.js',
   'js/ui/dom.js',
+  'js/ui/keypad.js',
   'js/ui/picker.js',
   'js/ui/purchase.js',
   'js/ui/rates.js',
