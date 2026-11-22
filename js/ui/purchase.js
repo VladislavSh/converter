@@ -12,8 +12,8 @@ import { $, $$, copyText, escapeHtml, setTicking } from './dom.js';
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
 
 export function createPurchaseView(app, { keypad }) {
-  // The order is always counted by the default (buy) prices of a bank with two
-  // of them: no switch here, the converter's choice does not apply
+  // The order and the delivery are always counted by a bank's sell prices (the
+  // higher ones): that is what buying the currency really costs
   const convert = (value, from, to) => app.convert(value, from, to, DEFAULT_SIDE);
   const el = {
     price: $('#sh-price'),

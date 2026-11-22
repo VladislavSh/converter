@@ -16,6 +16,15 @@ test('first launch: dollar, yuan, sum and rouble', () => {
   assert.equal(state.view, 'convert');
   assert.equal(state.v, STATE_VERSION);
   assert.deepEqual(state.shop, { ...SHOP_DEFAULTS });
+  assert.equal(state.rateSource, 'kapitalApi', 'Kapitalbank from bank.uz');
+});
+
+test('upgrade to v13: the old default (market rates) becomes Kapitalbank, a choice stays', () => {
+  assert.equal(buildState({ v: 12, rateSource: 'market' }).rateSource, 'kapitalApi');
+  assert.equal(buildState({ v: 12 }).rateSource, 'kapitalApi');
+  assert.equal(buildState({ v: 12, rateSource: 'cbu' }).rateSource, 'cbu');
+  assert.equal(buildState({ v: 13, rateSource: 'market' }).rateSource, 'market', 'chosen after the upgrade');
+  assert.equal('rateSide' in buildState({ v: 12, rateSide: 'buy' }), false, 'the buy/sell switch is gone');
 });
 
 test('theme and language follow the device until the user chooses', () => {
@@ -35,7 +44,6 @@ test('a current state is restored as it was saved', () => {
     sources: [{ id: 's1', name: 'Bank', quote: 'UZS', rates: [{ code: 'USD', rate: '12950' }, { code: 'CNY', rate: '1800' }] }],
     rateSource: 's1',
     kapital: { date: '22.11.2026', rates: [{ code: 'USD', buy: '11950', sell: '12050' }] },
-    rateSide: 'sell',
     shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34' }
   };
   assert.deepEqual(buildState(structuredClone(saved)), saved);

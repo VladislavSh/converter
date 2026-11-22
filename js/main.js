@@ -5,7 +5,7 @@ import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
 import {
-  BANK_SOURCES, KAPITAL, KAPITAL_API, NBU_API, resolveSource, sourceSummary, sourceTable
+  BANK_SOURCES, DEFAULT_SIDE, KAPITAL, KAPITAL_API, NBU_API, resolveSource, sourceSummary, sourceTable
 } from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState, restoreDroppedSum, startOrderInYuan, startWithoutDelivery } from './core/state.js';
@@ -49,7 +49,7 @@ const bankStatus = Object.fromEntries(BANK_SOURCES.map(bank => [bank, 'idle']));
 
 // The table calculations run on: the market rates with the chosen source's
 // rates put in, by the buy or the sell prices of a bank that has both. One
-// table per side, rebuilt only when the market rates or that source change.
+// table per side (the converter shows both sums), rebuilt only when the market rates or that source change.
 const tablesInUse = {};
 function ratesInUse(side) {
   if (!snapshot) return null;
@@ -75,13 +75,13 @@ const app = {
   locale: () => localeOf(state.lang),
   /**
    * With the chosen rate source; null while there are no rates.
-   * @param {'buy'|'sell'} [side]  a bank's buy or sell prices; the converter's choice by default
+   * @param {'buy'|'sell'} [side]  a bank's buy or sell prices; the sell ones by default
    */
-  convert: (value, from, to, side = state.rateSide) => convert(ratesInUse(side), value, from, to),
+  convert: (value, from, to, side = DEFAULT_SIDE) => convert(ratesInUse(side), value, from, to),
   /** Always by the market rates, to compare a source of one's own with. */
   marketConvert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
   /** The source in use: {id, kind, source, missing, side, twoSided}. */
-  rateSource: (side = state.rateSide) => resolveSource(state, banks, side),
+  rateSource: (side = DEFAULT_SIDE) => resolveSource(state, banks, side),
   /** What a source is called: the market one by the service it comes from. */
   sourceName: id => {
     if (id === 'market') return snapshot?.source || RATE_SOURCES.fiatPrimary.name;
@@ -108,7 +108,7 @@ const app = {
    * One line for a shared calculation, when its numbers are not the market ones.
    * @param {'buy'|'sell'} [side]  which prices of a bank with two of them were used
    */
-  rateNote: (side = state.rateSide) => {
+  rateNote: (side = DEFAULT_SIDE) => {
     const { kind, id, source, missing, twoSided } = resolveSource(state, banks, side);
     if (kind === 'market' || missing) return null;
     if (kind === 'bank') {
@@ -150,7 +150,7 @@ const shell = createShell(app, {
   }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
-const converter = createConverterView(app, { onEditList: () => picker.open(), keypad, onSideChange: () => renderAll() });
+const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
 const purchase = createPurchaseView(app, { keypad });
 const rateSources = createRatesView(app, { onChange: renderAll });
 const bankView = createBanksView(app, {

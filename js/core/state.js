@@ -3,12 +3,12 @@
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
 import {
-  DEFAULT_SIDE, RATE_SIDES, adoptOwnKapital, cleanKapital, cleanSources, isSourceId, mergeSameNames, sourcesFromPairs
+  DEFAULT_SOURCE, adoptOwnKapital, cleanKapital, cleanSources, isSourceId, mergeSameNames, sourcesFromPairs
 } from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
-export const STATE_VERSION = 12;
+export const STATE_VERSION = 13;
 
 /** The tabs: converter, purchase, banks. */
 export const VIEWS = Object.freeze(['convert', 'shop', 'banks']);
@@ -90,6 +90,9 @@ function migrate(state, fromVersion) {
   if (fromVersion < 8 && EARLIER_FEE_PRESETS.includes(feeRule(state.shop))) resetFeeRule(state.shop);
   // v10: the air rate went from 10 to 9.9 $/kg; a rate typed by hand stays
   if (fromVersion < 10 && parseNumber(state.shop.dlAir) === 10) state.shop.dlAir = SHOP_DEFAULTS.dlAir;
+  // v13: Kapitalbank from bank.uz became the default source; whoever still had
+  // the old default (the market rates) moves to it, any other choice stays
+  if (fromVersion < 13 && state.rateSource === 'market') state.rateSource = DEFAULT_SOURCE;
 }
 
 /**
@@ -146,13 +149,11 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     input: cleanText(raw.input, '100'),
     // the amount was typed on the main screen and "Purchase" has not taken it yet
     amountFresh: raw.amountFresh === true,
-    // where the rates come from: 'market', 'cbu', 'nbu', 'kapital' or a source of the user's own
+    // where the rates come from: 'market', a bank ('cbu', 'nbu', 'kapitalApi'…) or a source of the user's own
     sources: cleanSources(raw.sources),
-    rateSource: 'market',
+    rateSource: DEFAULT_SOURCE,
     // Kapitalbank's buy and sell prices, typed in from the bank's page
     kapital: cleanKapital(raw.kapital),
-    // which prices of a bank with two of them the converter counts by
-    rateSide: RATE_SIDES.includes(raw.rateSide) ? raw.rateSide : DEFAULT_SIDE,
     shop: cleanShop(raw.shop)
   };
   if (isSourceId(state, raw.rateSource)) state.rateSource = raw.rateSource;

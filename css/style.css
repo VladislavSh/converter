@@ -552,11 +552,50 @@ body[data-view="banks"] .rate-bar { display: none; }
 .kapital-hint { margin-bottom: 14px; }
 .kapital-hint .guide__lead { margin-bottom: 6px; }
 .kapital-hint .link-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-/* Converter: buy or sell prices of a bank that has both */
-.side-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 14px 2px 0; }
-.side-seg { flex: none; width: 216px; height: 40px; }
-.side-seg button { font-size: 13.5px; }
-.side-bar__note { flex: 1 1 160px; margin: 0; font-size: 12px; line-height: 1.35; color: var(--text-2); }
+/* Converter: a bank with buy and sell prices — both sums in every row */
+.res--two .res__main { align-items: flex-start; padding: 14px 0 12px; }
+.res--two .badge { margin-top: 2px; }
+.res--two .res__copy { margin-top: 10px; }
+.res__head { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; color: var(--text-2); }
+.res__head .res__name { font-weight: 700; color: var(--text); }
+.res__head i { flex: none; font-style: normal; font-size: 11.5px; font-weight: 800; letter-spacing: .05em; color: var(--text-3); }
+.res__sides { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.res__side {
+  position: relative; min-width: 0; display: grid; gap: 1px; padding: 8px 10px 7px; border-radius: 14px;
+  background: var(--input-bg); border: 1px solid transparent;
+}
+/* the sell price is the one orders and delivery are counted by */
+.res__side--sell {
+  background: linear-gradient(135deg, rgba(124, 92, 255, .16), rgba(34, 211, 238, .09)) padding-box;
+  border-color: rgba(124, 92, 255, .32);
+}
+.res__side small {
+  display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--text-3);
+}
+.res__side small::before { content: ''; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--good); }
+.res__side--sell small { color: var(--link); }
+.res__side--sell small::before { background: var(--accent); }
+.res__side b {
+  display: block; font-size: 20px; font-weight: 800; line-height: 1.2; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color .2s;
+}
+.res__side b[data-size="m"] { font-size: 17px; }
+.res__side b[data-size="s"] { font-size: 15px; }
+.res__side .res__rate { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res__main:hover .res__side b, .res__main:focus-visible .res__side b { color: var(--accent-1); }
+/* a currency the bank does not quote: one price, no labels */
+.res.is-same .res__sides { grid-template-columns: 1fr; }
+.res.is-same .res__side--sell { display: none; }
+.res.is-same .res__side small { display: none; }
+@media (max-width: 350px) {
+  .res__sides { gap: 4px; }
+  .res__side { padding: 7px 8px 6px; }
+  .res__side b { font-size: 18px; }
+  .res__side b[data-size="m"] { font-size: 15.5px; }
+  .res__side b[data-size="s"] { font-size: 14px; }
+}
 .src-row { display: flex; align-items: center; gap: 6px; }
 .src-row__sign { flex: none; font-weight: 800; font-size: 15px; color: var(--text-2); }
 .field .src-row select { width: 82px; flex: none; }

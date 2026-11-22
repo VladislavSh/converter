@@ -107,21 +107,23 @@ test('a bank is a whole source: all its rates go into the calculations at once',
   assert.ok(Math.abs(cv(1, 'RUB', 'UZS') - 146.56) < 1e-6, 'the CBU rouble');
   assert.ok(Math.abs(cv(1, 'USD', 'CNY') - 12004.48 / 1797.29) < 1e-9, 'dollar to yuan through the CBU sum');
 
-  // The National Bank is counted by its buy price (sell when chosen); not loaded yet → market rates meanwhile
+  // The National Bank is counted by its sell price (buy when asked); not loaded yet → market rates meanwhile
   selectSource(state, 'nbu');
   assert.equal(resolveSource(state, banks).missing, true);
   const nbu = bankSource('nbu', { ts: 1, date: '22.11.2026', rates: [{ code: 'USD', nominal: 1, buy: 11950, sell: 12060 }] });
-  assert.deepEqual(nbu.rates, [{ code: 'USD', rate: 11950 }], 'buy by default');
-  const nbuSell = bankSource('nbu', { ts: 1, date: '22.11.2026', rates: [{ code: 'USD', nominal: 1, buy: 11950, sell: 12060 }] }, 'sell');
-  assert.deepEqual(nbuSell.rates, [{ code: 'USD', rate: 12060 }]);
-  assert.equal(convert(sourceTable(MARKET, nbuSell), 100, 'USD', 'UZS'), 1206000, 'buying dollars at the bank');
-  const oneSide = bankSource('nbu', { ts: 1, date: '', rates: [{ code: 'EUR', nominal: 1, buy: null, sell: 14000 }] });
-  assert.deepEqual(oneSide.rates, [{ code: 'EUR', rate: 14000 }], 'only a sell price: that one, also for buy');
+  assert.deepEqual(nbu.rates, [{ code: 'USD', rate: 12060 }], 'sell by default');
+  assert.equal(convert(sourceTable(MARKET, nbu), 100, 'USD', 'UZS'), 1206000, 'buying dollars at the bank');
+  const nbuBuy = bankSource('nbu', { ts: 1, date: '22.11.2026', rates: [{ code: 'USD', nominal: 1, buy: 11950, sell: 12060 }] }, 'buy');
+  assert.deepEqual(nbuBuy.rates, [{ code: 'USD', rate: 11950 }]);
+  const oneSide = bankSource('nbu', { ts: 1, date: '', rates: [{ code: 'EUR', nominal: 1, buy: 14000, sell: null }] });
+  assert.deepEqual(oneSide.rates, [{ code: 'EUR', rate: 14000 }], 'only a buy price: that one, also for sell');
 });
 
 test('the Banks tab has its own link', () => {
   const state = buildState(null);
   state.view = 'banks';
+  assert.equal(buildQuery(state), 'mode=banks&src=kapitalApi', 'the default source goes along');
+  state.rateSource = 'market';
   assert.equal(buildQuery(state), 'mode=banks');
   const opened = buildState(null);
   assert.equal(applyDeepLink(opened, '?mode=banks&amount=5&price=7'), true);

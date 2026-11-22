@@ -5,7 +5,8 @@ import { isKnownCurrency } from '../js/core/names.js';
 import { buildState, SHOP_DEFAULTS } from '../js/core/state.js';
 import { adoptEarlierStorage } from '../js/services/storage.js';
 
-const fresh = () => buildState(null);
+// by the market rates: a link then carries no source
+const fresh = () => Object.assign(buildState(null), { rateSource: 'market' });
 const open = (search, state = fresh()) => ({ applied: applyDeepLink(state, search, isKnownCurrency), state });
 
 // ---------- converter ----------

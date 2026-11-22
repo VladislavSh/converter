@@ -16,13 +16,16 @@ const BASE = 'https://example.com/converter/';
 // Intl groups digits with non-breaking spaces; compare on ordinary ones
 const plain = text => text?.replace(/[\u00A0\u202F]/g, ' ');
 
+// by the market rates: a link then carries no source
+const fresh = () => Object.assign(buildState(null), { rateSource: 'market' });
+
 function converterText(overrides = {}, t = ru, locale = 'ru-RU') {
-  const state = Object.assign(buildState(null), overrides);
+  const state = Object.assign(fresh(), overrides);
   return plain(converterShareText({ state, convert: cv, t, locale, url: buildLink(state, BASE) }));
 }
 
 function purchaseText(shop, t = ru, locale = 'ru-RU') {
-  const state = buildState(null);
+  const state = fresh();
   Object.assign(state, { view: 'shop', shop: { ...SHOP_DEFAULTS, dlAir: '10', ...shop } });
   return plain(purchaseShareText({ result: calcPurchase(state.shop, cv), convert: cv, t, locale, url: buildLink(state, BASE) }));
 }

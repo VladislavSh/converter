@@ -1,9 +1,10 @@
 // Main screen: one amount in the "source" currency, shown in all the others.
+// With a bank that has buy and sell prices every row shows both sums at once.
 import { evaluate, isExpression, sanitizeExpression } from '../core/expression.js';
 import { formatAmount, plainNumber } from '../core/format.js';
 import { currencyName } from '../core/names.js';
 import { switchSource } from '../core/currency-list.js';
-import { RATE_SIDES } from '../core/rate-sources.js';
+import { DEFAULT_SIDE, RATE_SIDES } from '../core/rate-sources.js';
 import { applyPastedAmount, parsePastedAmount } from '../core/pasted-amount.js';
 import { converterShareText } from '../core/share-text.js';
 import { badgeHtml } from './badge.js';
@@ -12,9 +13,10 @@ import { $, $$, ICONS, copyText, escapeHtml, replayAnimation, setTicking } from 
 // Long amounts get a smaller type size instead of being cut off: [max length, size]
 const HERO_SIZES = [[7, 'xl'], [10, 'l'], [14, 'm'], [Infinity, 's']];
 const RESULT_SIZES = [[11, 'l'], [15, 'm'], [Infinity, 's']];
+const SIDE_SIZES = [[9, 'l'], [12, 'm'], [Infinity, 's']]; // half a row each
 const sizeFor = (length, sizes) => sizes.find(([max]) => length <= max)[1];
 
-export function createConverterView(app, { onEditList, keypad, onSideChange }) {
+export function createConverterView(app, { onEditList, keypad }) {
   const el = {
     hero: $('#hero'),
     tabs: $('#src-tabs'),
@@ -23,17 +25,15 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
     expr: $('#amount-expr'),
     results: $('#results'),
     edit: $('#manage-btn'),
-    share: $('#conv-share'),
-    sideSeg: $('#side-seg'),
-    sideNote: $('#side-note')
+    share: $('#conv-share')
   };
   let builtFor = '';
 
   const format = (value, code) => formatAmount(value, code, { locale: app.locale() });
 
-  function rateText(code) {
+  function rateText(code, side = DEFAULT_SIDE) {
     const { base } = app.state;
-    const one = app.convert(1, base, code);
+    const one = app.convert(1, base, code, side);
     if (one == null) return '';
     // "1 USD = 0,0000166 BTC" is unreadable — flip tiny rates around
     return one < 0.01
@@ -41,18 +41,32 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
       : `1 ${base} = ${format(one, code)}`; // the row itself names the currency
   }
 
-  function resultHtml(code, index = 0) {
+  /** One price of a bank in a row: "Покупка / 8,35 / 1 USD = 11 970". */
+  const sideHtml = side => `
+    <span class="res__side res__side--${side}" data-side="${side}">
+      <small>${escapeHtml(app.t(side === 'sell' ? 'sideSell' : 'sideBuy'))}</small>
+      <b data-role="value">—</b>
+      <span class="res__rate" data-role="rate"></span>
+    </span>`;
+
+  function resultHtml(code, index, twoSided) {
     const { t } = app;
-    return `
-      <li class="res" data-code="${code}" style="--i:${index}">
-        <button type="button" class="res__main" data-act="use" title="${escapeHtml(t('useAsSource', { code }))}">
-          ${badgeHtml(code)}
-          <span class="res__body">
+    const name = escapeHtml(currencyName(code, app.state.lang));
+    const body = twoSided
+      ? `
+            <span class="res__head"><span class="res__name">${name}</span><i>${code}</i></span>
+            <span class="res__sides">${RATE_SIDES.map(sideHtml).join('')}</span>`
+      : `
             <span class="res__value"><b data-role="value">—</b><i>${code}</i></span>
             <span class="res__meta">
-              <span class="res__name">${escapeHtml(currencyName(code, app.state.lang))}</span>
+              <span class="res__name">${name}</span>
               <span class="res__rate" data-role="rate"></span>
-            </span>
+            </span>`;
+    return `
+      <li class="res${twoSided ? ' res--two' : ''}" data-code="${code}" style="--i:${index}">
+        <button type="button" class="res__main" data-act="use" title="${escapeHtml(t('useAsSource', { code }))}">
+          ${badgeHtml(code)}
+          <span class="res__body">${body}
           </span>
         </button>
         <button type="button" class="res__copy" data-act="copy" aria-label="${escapeHtml(t('copyValue', { code }))}" title="${escapeHtml(t('copyValue', { code }))}">${ICONS.copy}</button>
@@ -60,7 +74,7 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
   }
 
   /** Rebuilds the currency chips and result rows; only when list, source or language change. */
-  function buildStructure() {
+  function buildStructure(twoSided) {
     const { state, t } = app;
     el.tabs.innerHTML = state.list.map(code => {
       const active = code === state.base;
@@ -69,7 +83,7 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
 
     const targets = state.list.filter(code => code !== state.base);
     el.results.innerHTML = targets.length
-      ? targets.map(resultHtml).join('')
+      ? targets.map((code, index) => resultHtml(code, index, twoSided)).join('')
       : `<li class="results__empty">${escapeHtml(t('needSecond'))}</li>`;
     replayAnimation(el.results, 'is-built'); // the rows rise in, one after another
 
@@ -98,44 +112,45 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
     el.input.dataset.size = sizeFor(el.input.value.length, HERO_SIZES);
     el.expr.textContent = calculating && value != null ? `= ${format(value, state.base)}` : '';
 
+    const amountIn = (code, side) => {
+      const converted = value == null ? null : app.convert(value, state.base, code, side);
+      return converted == null ? '—' : format(converted, code);
+    };
+
     for (const row of $$('.res', el.results)) {
       const code = row.dataset.code;
-      const converted = value == null ? null : app.convert(value, state.base, code);
-      const text = converted == null ? '—' : format(converted, code);
-      setTicking($('[data-role="value"]', row), text);
-      $('.res__value', row).dataset.size = sizeFor(text.length + code.length, RESULT_SIZES);
-      $('[data-role="rate"]', row).textContent = rateText(code);
+      if (!row.classList.contains('res--two')) {
+        const text = amountIn(code);
+        setTicking($('[data-role="value"]', row), text);
+        $('.res__value', row).dataset.size = sizeFor(text.length + code.length, RESULT_SIZES);
+        $('[data-role="rate"]', row).textContent = rateText(code);
+        continue;
+      }
+      // Both prices of the bank; a currency it does not quote has one price only
+      const rates = RATE_SIDES.map(side => rateText(code, side));
+      row.classList.toggle('is-same', rates[0] === rates[1]);
+      for (const [i, side] of RATE_SIDES.entries()) {
+        const cell = $(`[data-side="${side}"]`, row);
+        const text = amountIn(code, side);
+        const valueEl = $('[data-role="value"]', cell);
+        setTicking(valueEl, text);
+        valueEl.dataset.size = sizeFor(text.length, SIDE_SIZES);
+        $('[data-role="rate"]', cell).textContent = rates[i];
+      }
     }
   }
 
   function render() {
     const { state } = app;
-    const key = `${state.lang}|${state.base}|${state.list.join(',')}`;
+    const info = app.rateSource();
+    const twoSided = info.twoSided && !info.missing;
+    const key = `${state.lang}|${state.base}|${state.list.join(',')}|${twoSided}`;
     if (key !== builtFor) {
-      buildStructure();
+      buildStructure(twoSided);
       builtFor = key;
     }
     updateValues();
-    renderSide();
     revealActiveTab(); // also after the tab was hidden while the chips were built
-  }
-
-  /** Buy or sell: which prices of a bank that has both the converter counts by. */
-  function renderSide() {
-    for (const button of $$('button[data-side]', el.sideSeg)) {
-      const on = button.dataset.side === app.state.rateSide;
-      button.classList.toggle('is-active', on);
-      button.setAttribute('aria-checked', String(on));
-      button.tabIndex = on ? 0 : -1;
-    }
-    const info = app.rateSource();
-    el.sideNote.textContent = info.twoSided ? app.t('sideNoteTwo') : app.t('sideNoteOne', { name: app.sourceName(info.id) });
-  }
-  function setSide(side) {
-    if (side === app.state.rateSide || !RATE_SIDES.includes(side)) return;
-    app.state.rateSide = side;
-    app.save();
-    onSideChange();
   }
 
   /** @param {{keepAmount?: boolean}} [options] keepAmount: only the currency changes (the chips) */
@@ -160,18 +175,6 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
     app.save();
     updateValues();
   }
-
-  // --- buy / sell (a radio group of two) ---
-  el.sideSeg.addEventListener('click', event => {
-    const button = event.target.closest('button[data-side]');
-    if (button) setSide(button.dataset.side);
-  });
-  el.sideSeg.addEventListener('keydown', event => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    event.preventDefault();
-    setSide(app.state.rateSide === 'buy' ? 'sell' : 'buy');
-    $(`button[data-side="${app.state.rateSide}"]`, el.sideSeg).focus();
-  });
 
   // --- source currency chips (a radio group: arrows move the selection) ---
   // A chip changes only the currency of the amount: «100» stays 100, now in
@@ -270,7 +273,10 @@ export function createConverterView(app, { onEditList, keypad, onSideChange }) {
     if (converted == null) return;
     const text = formatAmount(converted, code, { plain: true });
     const copied = await copyText(text);
-    app.toast(copied ? app.t('copied', { text: `${text} ${code}` }) : app.t('copyFailed'));
+    // Of a row with two sums the sell one is copied, the one orders are counted by
+    const row = button.closest('.res');
+    const side = row.matches('.res--two:not(.is-same)') ? ` · ${app.t('sideSell').toLocaleLowerCase(app.locale())}` : '';
+    app.toast(copied ? app.t('copied', { text: `${text} ${code}${side}` }) : app.t('copyFailed'));
   });
 
   el.edit.addEventListener('click', () => onEditList());

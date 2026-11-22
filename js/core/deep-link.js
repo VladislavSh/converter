@@ -61,8 +61,6 @@ function applyConverter(state, params, isKnown) {
   if (amount !== undefined) state.input = amount;
   // The old amount was typed in another currency and means nothing in the new one
   else if (state.base !== previousBase) state.input = DEFAULT_AMOUNT;
-  // Buy prices unless the link says sell: the numbers must match the sender's
-  state.rateSide = params.get('side') === 'sell' ? 'sell' : 'buy';
 }
 
 function applyPurchase(shop, params) {
@@ -151,7 +149,6 @@ export function buildQuery(state) {
     params.set('amount', state.input);
     params.set('from', state.base);
     params.set('list', state.list.join(','));
-    if (state.rateSide === 'sell') params.set('side', 'sell');
   }
   for (const [key, value] of sourceParams(state)) params.set(key, value);
   // commas and colons are legal in a query and read better unescaped

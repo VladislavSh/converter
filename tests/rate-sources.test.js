@@ -15,7 +15,7 @@ const MARKET = { USD: 1, CNY: 7, UZS: 12000, RUB: 80 };
 const near = (actual, expected, message) =>
   assert.ok(Math.abs(actual - expected) < 1e-6, `${message ?? ''} ${actual} ≉ ${expected}`);
 const plain = text => text?.replace(/[\u00A0\u202F]/g, ' ');
-const fresh = () => buildState(null);
+const fresh = () => Object.assign(buildState(null), { rateSource: 'market' });
 const BANK = { name: 'Обменник', quote: 'UZS', rates: [{ code: 'USD', rate: '12 950' }, { code: 'CNY', rate: '1800' }, { code: 'RUB', rate: '150' }] };
 const with3 = table => (value, from, to) => convert(table, value, from, to);
 
@@ -120,7 +120,7 @@ test('a source quoted in another currency, and currencies the market does not ha
 
 test('the source in use, and a short summary of it', () => {
   const state = fresh();
-  assert.deepEqual(resolveSource(state), { id: 'market', kind: 'market', source: null, missing: false, side: 'buy', twoSided: false });
+  assert.deepEqual(resolveSource(state), { id: 'market', kind: 'market', source: null, missing: false, side: 'sell', twoSided: false });
   saveSource(state, BANK);
   assert.equal(resolveSource(state).kind, 'own');
   state.rateSource = 'gone';
@@ -148,7 +148,8 @@ test('state: the chosen source survives a reload, an unknown one does not', () =
   saveSource(saved, BANK);
   assert.equal(buildState(structuredClone(saved)).rateSource, 's1');
   assert.equal(buildState({ ...structuredClone(saved), rateSource: 'cbu' }).rateSource, 'cbu');
-  assert.equal(buildState({ ...structuredClone(saved), rateSource: 's9' }).rateSource, 'market');
+  assert.equal(buildState({ ...structuredClone(saved), rateSource: 's9' }).rateSource, 'kapitalApi', 'an unknown one: the default');
+  assert.equal(buildState({ ...structuredClone(saved), rateSource: 'market' }).rateSource, 'market', 'the market rates stay when chosen');
   assert.equal(isSourceId(saved, 'nbu'), true);
   assert.equal(fresh().rateSource, 'market');
 });

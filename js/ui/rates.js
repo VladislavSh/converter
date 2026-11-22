@@ -55,15 +55,17 @@ export function createRatesView(app, { onChange }) {
   // ---------- the bar ----------
 
   function renderBar() {
-    // The order is always counted by the buy prices, the converter by its choice
-    const info = app.rateSource(app.state.view === 'shop' ? DEFAULT_SIDE : app.state.rateSide);
+    // The order is counted by the sell prices; the converter shows both sums
+    const info = app.rateSource(DEFAULT_SIDE);
     el.bar.classList.toggle('is-custom', info.kind !== 'market');
     el.barName.textContent = sourceName(info.id);
     const parts = [];
     if (info.kind === 'bank') {
       if (info.missing) parts.push(app.t(info.id === KAPITAL ? 'srcKapitalEmpty' : 'srcNotLoaded'));
       else if (info.source.date) parts.push(app.t('srcOnDate', { date: info.source.date }));
-      if (info.twoSided && !info.missing) parts.push(app.t(info.side === 'sell' ? 'sideSell' : 'sideBuy').toLocaleLowerCase(app.locale()));
+      if (info.twoSided && !info.missing) {
+        parts.push(app.t(app.state.view === 'shop' ? 'sideSell' : 'sideBoth').toLocaleLowerCase(app.locale()));
+      }
     } else if (info.kind === 'own') {
       parts.push(sourceSummary(info.source, app.locale(), 1));
     }

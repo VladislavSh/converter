@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.25.0"></script>
-  <script src="js/boot-guard.js?v=1.25.0"></script>
-  <script src="js/install-early.js?v=1.25.0"></script>
+  <script src="js/theme-init.js?v=1.26.0"></script>
+  <script src="js/boot-guard.js?v=1.26.0"></script>
+  <script src="js/install-early.js?v=1.26.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.25.0">
+  <link rel="stylesheet" href="css/style.css?v=1.26.0">
 </head>
 <body>
 
@@ -118,15 +118,6 @@
         </div>
         <input class="hero__input" id="amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="0">
         <div class="hero__expr" id="amount-expr" aria-live="polite"></div>
-      </div>
-
-      <!-- Banks with buy and sell prices: which of them the converter counts by -->
-      <div class="side-bar">
-        <div class="seg side-seg" id="side-seg" role="radiogroup" data-i18n-aria="sideLabel" aria-label="Курс банков: покупка или продажа">
-          <button type="button" role="radio" aria-checked="true" class="is-active" data-side="buy" data-i18n="sideBuy">Покупка</button>
-          <button type="button" role="radio" aria-checked="false" data-side="sell" data-i18n="sideSell">Продажа</button>
-        </div>
-        <p class="side-bar__note" id="side-note"></p>
       </div>
 
       <ul class="results" id="results"></ul>
@@ -545,6 +536,6 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.25.0"></script>
+<script type="module" src="js/main.js?v=1.26.0"></script>
 </body>
 </html>

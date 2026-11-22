@@ -10,9 +10,10 @@
 //   sN     — a source of the user's own: a name and the rates of several
 //            currencies in one quote currency ("Exchange office: 1 USD = 12 950,
 //            1 CNY = 1 800 sums").
-// The banks with buy and sell prices are counted by one side of them:
-// "buy" (what the bank pays for a currency) unless "sell" is chosen. The
-// market rate and the Central Bank's rate are one number for both.
+// The banks with buy and sell prices are counted by their sell prices (what
+// the bank charges for a currency, the higher one); only the converter's rows
+// show both sums. The market rate and the Central Bank's rate are one number
+// for both.
 // A source replaces the market rates of the currencies it has; the others keep
 // theirs. Pure functions — no DOM, no storage.
 import { evaluate } from './expression.js';
@@ -27,7 +28,9 @@ export const BANK_SOURCES = Object.freeze(['cbu', 'nbu', NBU_API, KAPITAL_API]);
 /** The built-in sources after the market one, in the order of the lists: each bank's two side by side. */
 export const BUILTIN_SOURCES = Object.freeze(['cbu', 'nbu', NBU_API, KAPITAL, KAPITAL_API]);
 export const RATE_SIDES = Object.freeze(['buy', 'sell']);
-export const DEFAULT_SIDE = 'buy';
+export const DEFAULT_SIDE = 'sell';
+/** Where the rates come from on first launch: Kapitalbank's prices from bank.uz. */
+export const DEFAULT_SOURCE = KAPITAL_API;
 const TWO_SIDED = Object.freeze(['nbu', NBU_API, KAPITAL, KAPITAL_API]);
 /** Whether a source has separate buy and sell prices. */
 export const isTwoSided = id => TWO_SIDED.includes(id);
@@ -224,7 +227,7 @@ export function bankSource(bank, board, side = DEFAULT_SIDE) {
  * @returns {{id: string, kind: 'market'|'bank'|'own', source: object|null, missing: boolean, side: string, twoSided: boolean}}
  *   missing: a bank was chosen but its rates are not there (the market ones are used meanwhile)
  */
-export function resolveSource(state, banks = {}, side = state.rateSide ?? DEFAULT_SIDE) {
+export function resolveSource(state, banks = {}, side = DEFAULT_SIDE) {
   const id = state.rateSource;
   const twoSided = isTwoSided(id);
   if (BANK_SOURCES.includes(id) || id === KAPITAL) {
