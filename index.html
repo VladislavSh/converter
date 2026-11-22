@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.16.0"></script>
-  <script src="js/boot-guard.js?v=1.16.0"></script>
-  <script src="js/install-early.js?v=1.16.0"></script>
+  <script src="js/theme-init.js?v=1.17.0"></script>
+  <script src="js/boot-guard.js?v=1.17.0"></script>
+  <script src="js/install-early.js?v=1.17.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.16.0">
+  <link rel="stylesheet" href="css/style.css?v=1.17.0">
 </head>
 <body>
 
@@ -319,10 +319,11 @@
     <!-- Rates: pick a source and see its rates; one button makes it the source of every calculation -->
     <section class="banks" id="view-banks" role="tabpanel" aria-labelledby="tab-banks" hidden>
       <div class="card">
-        <div class="field">
-          <label for="src-select" data-i18n="srcPickLabel">Источник курсов</label>
-          <select id="src-select"></select>
-        </div>
+        <button type="button" class="src-picker" id="src-picker" aria-haspopup="dialog" aria-controls="src-sheet">
+          <span class="src-picker__label" data-i18n="srcPickLabel">Источник курсов</span>
+          <span class="src-picker__name" id="src-picker-name"></span>
+          <svg class="src-picker__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
         <div class="src-head">
           <p class="bank__sub" id="src-sub"></p>
           <a class="link-btn" id="src-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite" hidden>Сайт банка</a>
@@ -438,6 +439,21 @@
   </div>
 </div>
 
+<!-- Which source the Rates tab shows -->
+<div class="sheet" id="src-sheet" aria-hidden="true">
+  <div class="sheet__backdrop" data-close></div>
+  <div class="sheet__panel sheet__panel--fit" role="dialog" aria-modal="true" aria-labelledby="src-sheet-title">
+    <div class="sheet__grab" aria-hidden="true"></div>
+    <div class="sheet__head">
+      <h2 id="src-sheet-title" data-i18n="srcPickLabel">Источник курсов</h2>
+      <button type="button" class="icon-btn" data-close data-i18n-aria="close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <ul class="rate-list src-options" id="src-options" role="radiogroup" aria-labelledby="src-sheet-title"></ul>
+  </div>
+</div>
+
 <!-- Where "install" is in the browser, for browsers that do not offer it themselves -->
 <div class="sheet" id="install-sheet" aria-hidden="true">
   <div class="sheet__backdrop" data-close></div>
@@ -490,6 +506,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.16.0"></script>
+<script type="module" src="js/main.js?v=1.17.0"></script>
 </body>
 </html>

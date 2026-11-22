@@ -4,16 +4,20 @@
 // (core/rate-sources.js). The boards are loaded by main.js with the market rates.
 import { RATE_SOURCES } from '../config.js';
 import { shownBankCodes } from '../core/bank-rates.js';
-import { BANK_SOURCES, isSourceId, selectSource } from '../core/rate-sources.js';
+import { BANK_SOURCES, isSourceId, selectSource, sourceSummary } from '../core/rate-sources.js';
 import { formatAmount, formatNumber } from '../core/format.js';
 import { currencyName, isKnownFiat } from '../core/names.js';
 import { badgeHtml } from './badge.js';
-import { $, ICONS, escapeHtml } from './dom.js';
+import { $, $$, ICONS, createSheet, escapeHtml } from './dom.js';
+
+const FOCUS_DELAY_MS = 260; // after the sheet's opening transition
 
 export function createBanksView(app, { onSourceChange, onAddSource, onEditSource }) {
   const el = {
     view: $('#view-banks'),
-    select: $('#src-select'),
+    picker: $('#src-picker'),
+    pickerName: $('#src-picker-name'),
+    options: $('#src-options'),
     sub: $('#src-sub'),
     link: $('#src-link'),
     edit: $('#src-edit'),
@@ -22,6 +26,7 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
     more: $('#bank-more'),
     add: $('#src-add')
   };
+  const sheet = createSheet($('#src-sheet'), $('#app'));
   let picked = null; // the source chosen in the list; null = the one in use
   let lastInUse = app.state.rateSource;
   let expanded = false;
@@ -45,16 +50,52 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
       <span class="bank-row__value"><b>${cell(entry.sell)}</b></span></li>`;
   }
 
-  // ---------- the list of sources ----------
+  // ---------- choosing the source: a button and a sheet with the list ----------
 
-  function renderSelect() {
-    const ids = ['market', ...BANK_SOURCES, ...app.state.sources.map(source => source.id)];
-    const label = id => {
-      const name = id === 'market' ? `${app.sourceName(id)} — ${app.t('srcMarketTag')}` : app.sourceName(id);
-      return id === app.state.rateSource ? `✓ ${name}` : name;
-    };
-    el.select.innerHTML = ids.map(id => `<option value="${id}">${escapeHtml(label(id))}</option>`).join('');
-    el.select.value = shownId();
+  /** One line under a source's name: how fresh its rates are, or what is in it. */
+  function noteFor(id) {
+    const { t } = app;
+    if (id === 'market') return t('rateMarketNote');
+    if (BANK_SOURCES.includes(id)) {
+      const board = app.banks[id];
+      if (!board) return t(app.bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
+      return t(id === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
+    }
+    const own = app.state.sources.find(source => source.id === id);
+    return own ? sourceSummary(own, app.locale(), 2) : '';
+  }
+
+  function optionHtml(id) {
+    const shown = id === shownId();
+    const tag = id === app.state.rateSource ? `<span class="rate-item__tag">${escapeHtml(app.t('srcInUseTag'))}</span>` : '';
+    return `
+      <li class="rate-item${shown ? ' is-on' : ''}">
+        <button type="button" class="rate-item__main" role="radio" aria-checked="${shown}" data-pick="${id}" tabindex="${shown ? 0 : -1}">
+          <span class="check">${ICONS.check}</span>
+          <span class="rate-item__txt">
+            <span class="rate-item__name">${escapeHtml(app.sourceName(id))}</span>
+            <span class="rate-item__note">${escapeHtml(noteFor(id))}</span>
+          </span>
+          ${tag}
+        </button>
+      </li>`;
+  }
+
+  function renderPicker() {
+    el.pickerName.textContent = app.sourceName(shownId());
+    const group = key => `<li class="src-group" role="presentation">${escapeHtml(app.t(key))}</li>`;
+    const own = app.state.sources.map(source => source.id);
+    el.options.innerHTML = [
+      group('srcGroupNet'), ...['market', ...BANK_SOURCES].map(optionHtml),
+      ...(own.length ? [group('srcGroupOwn'), ...own.map(optionHtml)] : [])
+    ].join('');
+  }
+
+  function openPicker() {
+    renderPicker();
+    sheet.open();
+    // The keyboard and screen readers start on the source that is shown
+    setTimeout(() => $('[aria-checked="true"]', el.options)?.focus({ preventScroll: true }), FOCUS_DELAY_MS);
   }
 
   // ---------- the rates of the shown source ----------
@@ -103,7 +144,7 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
       picked = null;
     }
     const id = shownId();
-    renderSelect();
+    renderPicker();
     const view = sourceView(id);
     el.sub.textContent = view.sub;
     el.rates.innerHTML = view.rows;
@@ -117,10 +158,24 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
     el.more.querySelector('span').textContent = expanded ? app.t('bankLess') : app.t('bankMore', { n: view.hidden });
   }
 
-  el.select.addEventListener('change', () => {
-    picked = el.select.value;
+  el.picker.addEventListener('click', openPicker);
+  el.options.addEventListener('click', event => {
+    const option = event.target.closest('[data-pick]');
+    if (!option) return;
+    picked = option.dataset.pick;
     expanded = false;
+    sheet.close();
     render();
+  });
+  // A radio group: arrows move between the sources, Home / End jump to the ends
+  el.options.addEventListener('keydown', event => {
+    const radios = $$('[data-pick]', el.options);
+    const index = radios.indexOf(event.target);
+    if (index < 0) return;
+    const next = { ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: radios.length - 1 }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    radios[(next + radios.length) % radios.length].focus();
   });
   el.more.addEventListener('click', () => {
     expanded = !expanded;
