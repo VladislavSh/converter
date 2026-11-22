@@ -1,12 +1,14 @@
 // Bottom sheet for editing the currency list: search, add/remove, and
-// reordering on the "Selected" tab.
+// reordering on the "Selected" tab by dragging a row by its handle.
 import { CRYPTO, POPULAR } from '../data/currencies.js';
 import { currencyName, isKnownFiat } from '../core/names.js';
-import { moveCurrency, toggleCurrency } from '../core/currency-list.js';
+import { moveCurrency, reorderCurrency, toggleCurrency } from '../core/currency-list.js';
 import { badgeHtml } from './badge.js';
 import { $, $$, ICONS, escapeHtml } from './dom.js';
 
 const FOCUS_DELAY_MS = 250; // after the opening transition
+const AUTOSCROLL_EDGE_PX = 56; // dragging this close to the list's edge scrolls it
+const AUTOSCROLL_STEP_PX = 9; // per frame
 
 export function createPickerView(app, { onListChange }) {
   const el = {
@@ -18,6 +20,7 @@ export function createPickerView(app, { onListChange }) {
   };
   let tab = 'all';
   let opener = null;
+  let dragging = false;
 
   const isOpen = () => el.sheet.classList.contains('is-open');
 
@@ -49,24 +52,19 @@ export function createPickerView(app, { onListChange }) {
     return out;
   }
 
-  function moveButtons(code) {
-    const { list } = app.state;
-    const index = list.indexOf(code);
-    const button = (delta, label, icon, disabled) =>
-      `<button type="button" data-move="${delta}" aria-label="${escapeHtml(app.t(label, { code }))}"${disabled ? ' disabled' : ''}>${icon}</button>`;
-    return `<span class="pick__move">${button(-1, 'moveUp', ICONS.up, index === 0)}${button(1, 'moveDown', ICONS.down, index === list.length - 1)}</span>`;
-  }
+  const dragHandle = code =>
+    `<button type="button" class="pick__drag" data-drag aria-label="${escapeHtml(app.t('reorder', { code }))}">${ICONS.grip}</button>`;
 
   function itemHtml(code) {
     const selected = app.state.list.includes(code);
     return `
       <li class="pick${selected ? ' is-on' : ''}" data-code="${code}" role="checkbox" aria-checked="${selected}" tabindex="0">
+        ${tab === 'selected' ? dragHandle(code) : ''}
         ${badgeHtml(code)}
         <span class="pick__txt">
           <span class="pick__code">${code}</span>
           <span class="pick__name">${escapeHtml(currencyName(code, app.state.lang))}</span>
         </span>
-        ${tab === 'selected' ? moveButtons(code) : ''}
         <span class="check">${ICONS.check}</span>
       </li>`;
   }
@@ -80,7 +78,10 @@ export function createPickerView(app, { onListChange }) {
         (title ? `<li class="picker__section" role="presentation">${escapeHtml(title)}</li>` : '') +
         codes.map(itemHtml).join(''))
       .join('');
-    el.list.innerHTML = html || `<li class="picker__empty" role="presentation">${escapeHtml(app.t('nothing'))}</li>`;
+    const hint = tab === 'selected' && app.state.list.length > 1
+      ? `<li class="picker__hint" role="presentation">${escapeHtml(app.t('reorderHint'))}</li>`
+      : '';
+    el.list.innerHTML = html ? hint + html : `<li class="picker__empty" role="presentation">${escapeHtml(app.t('nothing'))}</li>`;
   }
 
   function open() {
@@ -128,16 +129,83 @@ export function createPickerView(app, { onListChange }) {
     onListChange();
   }
 
-  function move(code, delta) {
-    if (!moveCurrency(app.state, code, delta)) return;
+  /** After the order changed: save, redraw, keep the keyboard on the same handle. */
+  function reordered(code) {
     app.save();
     render();
     onListChange();
-    // Keep the keyboard on the same arrow, or on its twin when it became disabled
-    const row = $(`.pick[data-code="${code}"]`, el.list);
-    const same = $(`[data-move="${delta}"]`, row);
-    (same.disabled ? $(`[data-move="${-delta}"]`, row) : same).focus();
+    $(`.pick[data-code="${code}"] [data-drag]`, el.list)?.focus({ preventScroll: true });
   }
+
+  // ---------- dragging in "Selected" ----------
+
+  function startDrag(event, handle) {
+    if (event.button !== 0 || dragging) return;
+    const row = handle.closest('.pick');
+    const rows = $$('.pick', el.list);
+    const from = rows.indexOf(row);
+    if (rows.length < 2 || from < 0) return;
+    event.preventDefault(); // no text selection, no scrolling of the list by this touch
+    dragging = true;
+
+    const pitch = rows[1].offsetTop - rows[0].offsetTop; // the height of a row with its gap
+    const startY = event.clientY;
+    const startScroll = el.list.scrollTop;
+    let pointerY = startY;
+    let to = from;
+    let frame = 0;
+    row.classList.add('is-dragging');
+    el.list.classList.add('is-sorting');
+    try { handle.setPointerCapture(event.pointerId); } catch { /* the pointer is already gone */ }
+
+    // The dragged row follows the finger; the rows it passes make room for it
+    function layout() {
+      const offset = pointerY - startY + el.list.scrollTop - startScroll;
+      to = Math.min(rows.length - 1, Math.max(0, from + Math.round(offset / pitch)));
+      row.style.transform = `translateY(${offset}px)`;
+      rows.forEach((other, index) => {
+        if (other === row) return;
+        let shift = 0;
+        if (from < to && index > from && index <= to) shift = -pitch;
+        else if (from > to && index >= to && index < from) shift = pitch;
+        other.style.transform = shift ? `translateY(${shift}px)` : '';
+      });
+    }
+
+    // Near the top or bottom edge the list scrolls, so a long list can be crossed
+    function tick() {
+      const box = el.list.getBoundingClientRect();
+      if (pointerY < box.top + AUTOSCROLL_EDGE_PX) el.list.scrollTop -= AUTOSCROLL_STEP_PX;
+      else if (pointerY > box.bottom - AUTOSCROLL_EDGE_PX) el.list.scrollTop += AUTOSCROLL_STEP_PX;
+      layout();
+      frame = requestAnimationFrame(tick);
+    }
+
+    const move = moveEvent => { pointerY = moveEvent.clientY; };
+    function finish() {
+      cancelAnimationFrame(frame);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', finish);
+      handle.removeEventListener('pointercancel', finish);
+      handle.removeEventListener('lostpointercapture', finish);
+      row.classList.remove('is-dragging');
+      el.list.classList.remove('is-sorting');
+      rows.forEach(other => { other.style.transform = ''; });
+      dragging = false;
+      const code = row.dataset.code;
+      // The search may hide some rows: the place is taken from the row dropped onto
+      const target = rows[to].dataset.code;
+      if (to !== from && reorderCurrency(app.state, code, app.state.list.indexOf(target))) reordered(code);
+    }
+
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', finish);
+    handle.addEventListener('lostpointercapture', finish);
+    frame = requestAnimationFrame(tick);
+  }
+
+  // ---------- events ----------
 
   el.sheet.addEventListener('click', event => {
     if (event.target.closest('[data-close]')) close();
@@ -153,14 +221,26 @@ export function createPickerView(app, { onListChange }) {
     render();
     el.list.scrollTop = 0;
   }));
+  el.list.addEventListener('pointerdown', event => {
+    const handle = event.target.closest('[data-drag]');
+    if (handle) startDrag(event, handle);
+  });
   el.list.addEventListener('click', event => {
     const item = event.target.closest('.pick');
-    if (!item) return;
-    const arrow = event.target.closest('[data-move]');
-    if (arrow) move(item.dataset.code, Number(arrow.dataset.move));
-    else toggle(item);
+    // The handle is for dragging: a tap on it must not remove the currency
+    if (!item || event.target.closest('[data-drag]')) return;
+    toggle(item);
   });
   el.list.addEventListener('keydown', event => {
+    const handle = event.target.closest('[data-drag]');
+    if (handle) {
+      const delta = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+      if (!delta) return;
+      event.preventDefault();
+      const code = handle.closest('.pick').dataset.code;
+      if (moveCurrency(app.state, code, delta)) reordered(code);
+      return;
+    }
     if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.pick')) {
       event.preventDefault();
       toggle(event.target);
@@ -170,5 +250,5 @@ export function createPickerView(app, { onListChange }) {
     if (event.key === 'Escape' && isOpen()) close();
   });
 
-  return { open, close, render: () => { if (isOpen()) render(); } };
+  return { open, close, render: () => { if (isOpen() && !dragging) render(); } };
 }

@@ -1,5 +1,6 @@
-// Currency metadata. Fiat names come from Intl.DisplayNames (core/names.js);
-// crypto is listed here because Intl does not know it.
+// Currency metadata. Fiat names come from Intl.DisplayNames (core/names.js),
+// with names of our own for the popular ones; crypto is listed here because
+// Intl does not know it.
 
 export const CRYPTO = Object.freeze([
   { code: 'BTC',  id: 'bitcoin',          sym: '₿',  color: ['#F7931A', '#C46A00'], name: { ru: 'Биткоин', en: 'Bitcoin' } },
@@ -33,6 +34,49 @@ export const POPULAR = Object.freeze([
 
 // Currency code -> ISO country code of the flag, when it is not the first two letters
 export const FLAG_OVERRIDE = Object.freeze({ EUR: 'eu', ANG: 'cw', XCD: 'ag', XAF: 'cm', XOF: 'sn', XPF: 'pf', BTN: 'bt' });
+
+/**
+ * Active ISO 4217 currency codes. Whether the app knows a currency must not
+ * depend on the phone: some browsers ship Intl data that cannot name rarer
+ * currencies — the sum among them — and the app used to drop those.
+ */
+export const ISO_FIAT = new Set(`
+  AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BZD
+  CAD CDF CHF CLP CNY COP CRC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD
+  GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT
+  LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR
+  NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD
+  SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV WST XAF XCD
+  XCG XOF XPF YER ZAR ZMW ZWG ZWL
+`.trim().split(/\s+/));
+
+/** Names of the popular currencies, for phones whose Intl data has none. */
+export const FIAT_NAMES = Object.freeze({
+  USD: { ru: 'Доллар США', en: 'US Dollar' },
+  EUR: { ru: 'Евро', en: 'Euro' },
+  RUB: { ru: 'Российский рубль', en: 'Russian Ruble' },
+  UZS: { ru: 'Узбекский сум', en: 'Uzbekistani Som' },
+  KZT: { ru: 'Казахстанский тенге', en: 'Kazakhstani Tenge' },
+  UAH: { ru: 'Украинская гривна', en: 'Ukrainian Hryvnia' },
+  BYN: { ru: 'Белорусский рубль', en: 'Belarusian Ruble' },
+  GBP: { ru: 'Британский фунт стерлингов', en: 'British Pound' },
+  CNY: { ru: 'Китайский юань', en: 'Chinese Yuan' },
+  JPY: { ru: 'Японская иена', en: 'Japanese Yen' },
+  TRY: { ru: 'Турецкая лира', en: 'Turkish Lira' },
+  AED: { ru: 'Дирхам ОАЭ', en: 'UAE Dirham' },
+  GEL: { ru: 'Грузинский лари', en: 'Georgian Lari' },
+  AMD: { ru: 'Армянский драм', en: 'Armenian Dram' },
+  AZN: { ru: 'Азербайджанский манат', en: 'Azerbaijani Manat' },
+  KGS: { ru: 'Киргизский сом', en: 'Kyrgystani Som' },
+  TJS: { ru: 'Таджикский сомони', en: 'Tajikistani Somoni' },
+  PLN: { ru: 'Польский злотый', en: 'Polish Zloty' },
+  CHF: { ru: 'Швейцарский франк', en: 'Swiss Franc' },
+  CAD: { ru: 'Канадский доллар', en: 'Canadian Dollar' },
+  INR: { ru: 'Индийская рупия', en: 'Indian Rupee' },
+  KRW: { ru: 'Южнокорейская вона', en: 'South Korean Won' },
+  THB: { ru: 'Таиландский бат', en: 'Thai Baht' },
+  VND: { ru: 'Вьетнамский донг', en: 'Vietnamese Dong' }
+});
 
 // Names for codes Intl.DisplayNames does not know
 export const FIAT_EXTRA = Object.freeze({

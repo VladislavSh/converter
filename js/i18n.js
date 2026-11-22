@@ -59,8 +59,8 @@ export const MESSAGES = Object.freeze({
     otherFiat: 'Другие валюты',
     nothing: 'Ничего не найдено',
     keepOne: 'В списке должна остаться хотя бы одна валюта',
-    moveUp: 'Поднять {code} выше',
-    moveDown: 'Опустить {code} ниже',
+    reorder: 'Порядок {code}: перетащите или нажимайте стрелки вверх и вниз',
+    reorderHint: 'Чтобы поменять порядок на главном экране, перетащите валюту за точки слева',
     close: 'Закрыть',
 
     rateBar: 'Курс',
@@ -244,8 +244,8 @@ export const MESSAGES = Object.freeze({
     otherFiat: 'Other currencies',
     nothing: 'Nothing found',
     keepOne: 'At least one currency must stay in the list',
-    moveUp: 'Move {code} up',
-    moveDown: 'Move {code} down',
+    reorder: 'Order of {code}: drag, or press the up and down arrows',
+    reorderHint: 'To change the order on the main screen, drag a currency by the dots on the left',
     close: 'Close',
 
     rateBar: 'Rate',

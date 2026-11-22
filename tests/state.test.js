@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildState, SHOP_DEFAULTS, STATE_VERSION } from '../js/core/state.js';
-import { moveCurrency, switchSource, toggleCurrency } from '../js/core/currency-list.js';
+import { moveCurrency, reorderCurrency, switchSource, toggleCurrency } from '../js/core/currency-list.js';
 import { convert } from '../js/core/rates.js';
 
 const TABLE = { USD: 1, CNY: 7, UZS: 12000, RUB: 80 };
@@ -182,4 +182,18 @@ test('moveCurrency reorders within bounds', () => {
   assert.equal(moveCurrency(state, 'CNY', 1), false, 'already last');
   assert.equal(moveCurrency(state, 'RUB', 1), false, 'not in the list');
   assert.deepEqual(state.list, ['UZS', 'USD', 'CNY']);
+});
+
+test('reorderCurrency puts a currency at any place, as dragging does', () => {
+  const state = { list: ['USD', 'CNY', 'UZS', 'RUB'] };
+  assert.equal(reorderCurrency(state, 'RUB', 0), true);
+  assert.deepEqual(state.list, ['RUB', 'USD', 'CNY', 'UZS'], 'last to first');
+  assert.equal(reorderCurrency(state, 'RUB', 3), true);
+  assert.deepEqual(state.list, ['USD', 'CNY', 'UZS', 'RUB'], 'and back');
+  assert.equal(reorderCurrency(state, 'USD', 2), true);
+  assert.deepEqual(state.list, ['CNY', 'UZS', 'USD', 'RUB'], 'down two places');
+  for (const [code, to] of [['USD', 2], ['USD', -1], ['USD', 4], ['USD', 1.5], ['EUR', 0], ['USD', '1']]) {
+    assert.equal(reorderCurrency(state, code, to), false, `${code} → ${to}`);
+  }
+  assert.deepEqual(state.list, ['CNY', 'UZS', 'USD', 'RUB'], 'refusals change nothing');
 });

@@ -6,7 +6,7 @@ import { cleanCustomRates } from './custom-rates.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
-export const STATE_VERSION = 8;
+export const STATE_VERSION = 9;
 
 // The fee defaults are for a card linked in Pinduoduo itself: 3%, at least 2 ¥
 export const SHOP_DEFAULTS = Object.freeze({
@@ -76,6 +76,20 @@ function migrate(state, fromVersion) {
   // v8: the default rule is the one of a card linked in Pinduoduo (3%, at least
   // 2 ¥). A rule the user typed in themselves is left alone.
   if (fromVersion < 8 && EARLIER_FEE_PRESETS.includes(feeRule(state.shop))) resetFeeRule(state.shop);
+}
+
+/**
+ * Up to 1.10.0 a phone whose browser could not name the sum dropped UZS from
+ * the list on every start (the list in the address bar was checked against the
+ * browser's names). It is put back once, at its usual place. This runs after
+ * the link in the address bar is applied, which would otherwise drop it again.
+ * @param {number|null} savedVersion  the version of the state found in storage
+ * @returns {boolean} whether the sum was put back
+ */
+export function restoreDroppedSum(state, savedVersion) {
+  if (!Number.isInteger(savedVersion) || savedVersion >= 9 || state.list.includes('UZS')) return false;
+  state.list.splice(Math.min(DEFAULT_LIST.indexOf('UZS'), state.list.length), 0, 'UZS');
+  return true;
 }
 
 /**

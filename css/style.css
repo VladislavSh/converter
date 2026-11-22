@@ -523,11 +523,21 @@ h1, h2, p { margin: 0; }
 .pick.is-on .check svg { transform: scale(1); }
 .picker__section { font-size: 13px; font-weight: 700; color: var(--text-2); padding: 16px 10px 6px; }
 .picker__empty { padding: 30px 10px; text-align: center; font-size: 14px; color: var(--text-2); }
-.pick__move { display: flex; gap: 4px; flex: none; }
-.pick__move button { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: var(--text-2); background: var(--input-bg); }
-.pick__move button:hover:not(:disabled) { color: var(--text); }
-.pick__move button:disabled { opacity: .35; cursor: default; }
-.pick__move svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* "Selected": drag a row by its handle to reorder */
+.picker__hint { padding: 4px 10px 8px; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+.pick__drag {
+  width: 36px; height: 44px; margin: -4px 0 -4px -6px; flex: none; display: grid; place-items: center;
+  border-radius: 12px; color: var(--text-3); cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.pick__drag:hover, .pick__drag:focus-visible { color: var(--text); background: var(--input-bg); }
+.pick__drag svg { width: 18px; height: 18px; fill: currentColor; }
+.picker.is-sorting { user-select: none; -webkit-user-select: none; }
+.picker.is-sorting .pick { transition: transform .18s var(--ease); }
+.picker.is-sorting .pick:hover { background: none; }
+.picker.is-sorting .pick.is-dragging {
+  position: relative; z-index: 1; transition: none; cursor: grabbing;
+  background: var(--sheet); box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .55);
+}
 
 /* ---------- Calculator keypad ---------- */
 .keypad {

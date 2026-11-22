@@ -37,11 +37,16 @@ export function toggleCurrency(state, code, convert) {
   return 'removed';
 }
 
-/** Moves a currency up (-1) or down (+1) in the list. */
-export function moveCurrency(state, code, delta) {
+/**
+ * Puts a currency at another place in the list (dragging it in "Selected").
+ * @returns {boolean} whether the order changed
+ */
+export function reorderCurrency(state, code, toIndex) {
   const from = state.list.indexOf(code);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= state.list.length || to === from) return false;
-  state.list.splice(to, 0, state.list.splice(from, 1)[0]);
+  if (from < 0 || !Number.isInteger(toIndex) || toIndex < 0 || toIndex >= state.list.length || toIndex === from) return false;
+  state.list.splice(toIndex, 0, state.list.splice(from, 1)[0]);
   return true;
 }
+
+/** Moves a currency up (-1) or down (+1) in the list (the arrow keys on its handle). */
+export const moveCurrency = (state, code, delta) => reorderCurrency(state, code, state.list.indexOf(code) + delta);

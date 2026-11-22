@@ -4,7 +4,7 @@ import { activeCustomRate, withCustomRate } from './core/custom-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
 import { convert, restoreSnapshot } from './core/rates.js';
-import { buildState } from './core/state.js';
+import { buildState, restoreDroppedSum } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
 import { loadLatestRates } from './services/rates-api.js';
 import { adoptEarlierStorage, clearSessionFlag, readJson, takeSessionFlag, writeJson } from './services/storage.js';
@@ -21,12 +21,14 @@ import { createShell } from './ui/shell.js';
 
 try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
 
-const state = buildState(readJson(STORAGE_KEYS.state), {
+const saved = readJson(STORAGE_KEYS.state);
+const state = buildState(saved, {
   language: navigator.language,
   prefersLight: matchMedia('(prefers-color-scheme: light)').matches
 });
 // A link to a calculation (?mode=…) wins over what was saved on this device
 applyDeepLink(state, location.search, isKnownCurrency);
+restoreDroppedSum(state, Number.isInteger(saved?.v) ? saved.v : null);
 let snapshot = restoreSnapshot(readJson(STORAGE_KEYS.rates));
 
 // The table calculations run on: the market rates, with one pair replaced

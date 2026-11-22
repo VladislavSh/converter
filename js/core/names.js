@@ -1,5 +1,5 @@
 // Human-readable currency names, symbols and flags.
-import { CRYPTO_BY_CODE, FIAT_EXTRA, FLAG_OVERRIDE, isCrypto } from '../data/currencies.js';
+import { CRYPTO_BY_CODE, FIAT_EXTRA, FIAT_NAMES, FLAG_OVERRIDE, ISO_FIAT, isCrypto } from '../data/currencies.js';
 
 /**
  * ISO country code of the currency's flag ("us" for USD), or '' when there is
@@ -11,7 +11,7 @@ export function flagCountry(code) {
   return /^[a-z]{2}$/.test(country) ? country : '';
 }
 
-/** A currency the app can name: listed crypto or a fiat code Intl knows. */
+/** A currency the app knows: listed crypto or a fiat currency. */
 export const isKnownCurrency = code => isCrypto(code) || isKnownFiat(code);
 
 const displayNamesCache = new Map();
@@ -25,8 +25,14 @@ function displayNames(lang) {
   return displayNamesCache.get(lang);
 }
 
+/** The name from the browser's Intl data, or null when it has none (it then returns the code). */
 function intlName(code, lang) {
-  try { return displayNames(lang)?.of(code) ?? code; } catch { return code; }
+  try {
+    const name = displayNames(lang)?.of(code);
+    return name && name !== code ? name : null;
+  } catch {
+    return null;
+  }
 }
 
 const capitalize = text => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
@@ -37,14 +43,20 @@ export function currencyName(code, lang = 'ru') {
     return name[lang] || name.en;
   }
   if (Object.hasOwn(FIAT_EXTRA, code)) return FIAT_EXTRA[code][lang] || FIAT_EXTRA[code].en;
-  return capitalize(intlName(code, lang));
+  const name = intlName(code, lang);
+  if (name) return capitalize(name);
+  if (Object.hasOwn(FIAT_NAMES, code)) return FIAT_NAMES[code][lang] || FIAT_NAMES[code].en;
+  return code;
 }
 
-/** A fiat currency we can name. Filters crypto and junk codes out of API responses. */
+/**
+ * A fiat currency. Filters crypto and junk codes out of API responses. The ISO
+ * list decides first, so the answer is the same on every phone; Intl adds the
+ * few codes the rate APIs have beyond it.
+ */
 export function isKnownFiat(code) {
-  if (isCrypto(code)) return false;
-  if (Object.hasOwn(FIAT_EXTRA, code)) return true;
-  return intlName(code, 'en') !== code;
+  if (typeof code !== 'string' || isCrypto(code)) return false;
+  return ISO_FIAT.has(code) || Object.hasOwn(FIAT_EXTRA, code) || intlName(code, 'en') != null;
 }
 
 /** Short symbol for the badge when there is no flag: "$", "₽", or two letters. */
