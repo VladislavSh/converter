@@ -152,22 +152,32 @@ h1, h2, p { margin: 0; }
 /* ---------- View tabs ---------- */
 /* The tabs stay at hand while a long form scrolls under them */
 .views {
-  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 20; --tab-index: 0;
+  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 20;
   display: flex; gap: 4px; padding: 4px; margin-bottom: 14px;
   border-radius: 18px; background: var(--bar-bg); border: 1px solid var(--card-border);
   -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
 }
 .views::before {
-  content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 16px) / 3);
+  content: ''; position: absolute; top: 4px; bottom: 4px; left: 0;
+  width: var(--pill-w, calc((100% - 16px) / 3)); transform: translateX(var(--pill-x, 4px));
   border-radius: 14px; background: var(--tab-active); box-shadow: 0 2px 10px -4px rgba(0, 0, 0, .35);
-  transform: translateX(calc(var(--tab-index) * (100% + 4px))); transition: transform .5s var(--spring);
 }
+.views.is-placed::before { transition: transform .5s var(--spring), width .5s var(--spring); }
+/* An icon over the name, as in an app's tab bar; each tab as wide as its name */
 .view-tab {
-  position: relative; z-index: 1; flex: 1; min-height: 42px; padding: 0 12px; border-radius: 14px;
-  font-weight: 700; font-size: 14px; color: var(--text-2); transition: color .3s var(--ease), transform .15s var(--ease);
+  position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; min-height: 54px; padding: 6px 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 14px; font-weight: 700; font-size: 12px; line-height: 1.15; white-space: nowrap;
+  color: var(--text-2); transition: color .3s var(--ease), transform .15s var(--ease);
+}
+.view-tab svg {
+  width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; transition: stroke .3s var(--ease);
 }
 .view-tab:active { transform: scale(.96); }
 .view-tab.is-active { color: var(--text); }
+.view-tab.is-active svg { stroke: var(--accent-1); animation: tab-icon .55s var(--pop); }
+@keyframes tab-icon { 0% { transform: scale(.7) translateY(2px); } 60% { transform: scale(1.12) translateY(-1px); } }
 
 /* ---------- Currency badge ---------- */
 .badge {

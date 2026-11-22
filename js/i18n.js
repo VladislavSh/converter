@@ -18,7 +18,7 @@ export const MESSAGES = Object.freeze({
     switchTheme: 'Сменить тему',
     switchLang: 'Switch to English',
     viewConvert: 'Конвертер',
-    viewPurchase: 'Покупка',
+    viewPurchase: 'Заказ + доставка',
     viewBanks: 'Курсы',
 
     sourceLabel: 'Валюта суммы',
@@ -72,7 +72,7 @@ export const MESSAGES = Object.freeze({
     rateBar: 'Курс',
     rateOpen: 'Выбрать источник курсов для расчётов',
     ratesTitle: 'Источник курсов',
-    rateLead: 'Все расчёты — и в конвертере, и в покупке — идут по курсам выбранного источника.',
+    rateLead: 'Все расчёты — и в конвертере, и в заказе — идут по курсам выбранного источника.',
     rateMarketNote: 'Рыночный курс из сети, обновляется сам',
     srcPickLabel: 'Источник курсов',
     srcGroupNet: 'Из сети',
@@ -261,7 +261,7 @@ export const MESSAGES = Object.freeze({
     switchTheme: 'Switch theme',
     switchLang: 'Переключить на русский',
     viewConvert: 'Converter',
-    viewPurchase: 'Purchase',
+    viewPurchase: 'Order + delivery',
     viewBanks: 'Rates',
 
     sourceLabel: 'Amount currency',

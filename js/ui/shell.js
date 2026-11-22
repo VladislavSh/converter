@@ -87,13 +87,28 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   function setView(view) {
     app.state.view = VIEWS.includes(view) ? view : 'convert';
     document.body.dataset.view = app.state.view; // the Banks tab hides the "Rate" bar
-    el.nav.style.setProperty('--tab-index', String(VIEWS.indexOf(app.state.view))); // the pill slides there
     el.tabs.forEach(tab => {
       const active = tab.dataset.view === app.state.view;
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', String(active));
     });
     for (const [name, node] of Object.entries(el.views)) node.hidden = name !== app.state.view;
+    placePill();
+  }
+
+  /** The highlight slides under the chosen tab; the tabs are as wide as their names. */
+  function placePill() {
+    const tab = el.tabs.find(node => node.dataset.view === app.state.view);
+    if (!tab?.offsetWidth) return;
+    el.nav.style.setProperty('--pill-x', `${tab.offsetLeft}px`);
+    el.nav.style.setProperty('--pill-w', `${tab.offsetWidth}px`);
+    // the first placing is not animated: the pill simply is there
+    if (!el.nav.classList.contains('is-placed')) requestAnimationFrame(() => el.nav.classList.add('is-placed'));
+  }
+  // A new language, a loaded font or a turned phone changes the widths
+  if ('ResizeObserver' in window) {
+    const watcher = new ResizeObserver(() => placePill());
+    el.tabs.forEach(tab => watcher.observe(tab));
   }
 
   function setRefreshing(on) {
