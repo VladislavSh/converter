@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyDeepLink, buildQuery } from '../js/core/deep-link.js';
 import {
-  MAX_SOURCES, MAX_SOURCE_RATES, adoptLinkedSource, cleanSources, isSourceId, rateValue, removeSource,
+  MAX_SOURCES, MAX_SOURCE_RATES, adoptLinkedSource, mergeSameNames, cleanSources, isSourceId, rateValue, removeSource,
   resolveSource, saveSource, selectSource, sourceParams, sourceSummary, sourceTable, sourcesFromPairs
 } from '../js/core/rate-sources.js';
 import { convert } from '../js/core/rates.js';
@@ -78,8 +78,8 @@ test('editing, choosing and deleting sources', () => {
 
 test('limits: sources and currencies per source', () => {
   const state = fresh();
-  for (let n = 0; n < MAX_SOURCES; n++) assert.equal(saveSource(state, BANK).ok, true);
-  assert.deepEqual(saveSource(state, BANK), { ok: false, error: 'full' });
+  for (let n = 0; n < MAX_SOURCES; n++) assert.equal(saveSource(state, { ...BANK, name: `Банк ${n}` }).ok, true);
+  assert.deepEqual(saveSource(state, { ...BANK, name: 'Ещё один' }), { ok: false, error: 'full' });
   const codes = ['AED', 'AMD', 'AUD', 'AZN', 'BYN', 'CAD', 'CHF', 'CNY', 'EUR', 'GBP', 'GEL', 'INR', 'JPY', 'KGS', 'KRW', 'KZT', 'PLN', 'RUB', 'THB', 'TJS', 'TRY', 'USD'];
   const many = fresh();
   saveSource(many, { name: 'all', quote: 'UZS', rates: codes.map(code => ({ code, rate: '1' })) });
@@ -236,4 +236,46 @@ test('a shared calculation names its source', () => {
   assert.match(ru('shareSourceBank', { name: 'ЦБ Узбекистана', date: '21.11.2026' }), /^Курсы: ЦБ Узбекистана на 21\.11\.2026$/);
   const market = converterShareText({ state, convert: with3(MARKET), t: ru, locale: 'ru-RU', rateNote: null, url: 'u' });
   assert.equal(market.includes('📌'), false);
+});
+
+// ---------- one source per name ----------
+
+test('a second source with a taken name is refused, renaming onto one too', () => {
+  const state = fresh();
+  saveSource(state, BANK);
+  assert.deepEqual(saveSource(state, { ...BANK, name: '  капиталбанк ' }), { ok: false, error: 'name' }, 'case and spaces do not matter');
+  saveSource(state, { name: 'Малика', quote: 'UZS', rates: [{ code: 'USD', rate: '12800' }] });
+  assert.deepEqual(saveSource(state, { id: 's2', name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '1' }] }), { ok: false, error: 'name' });
+  assert.equal(saveSource(state, { id: 's1', ...BANK, rates: [{ code: 'USD', rate: '13000' }] }).ok, true, 'a source keeps its own name when edited');
+  assert.deepEqual(state.sources.map(source => source.name), ['Капиталбанк', 'Малика']);
+});
+
+test('a link with a source the user already has by name updates it instead of adding a copy', () => {
+  const state = fresh();
+  saveSource(state, { name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '12990' }] });
+  selectSource(state, 'market');
+  applyDeepLink(state, '?mode=banks&src=own&srcname=%D0%9A%D0%B0%D0%BF%D0%B8%D1%82%D0%B0%D0%BB%D0%B1%D0%B0%D0%BD%D0%BA&srcq=UZS&srcr=USD:12050,EUR:13310');
+  assert.equal(state.sources.length, 1, 'still one "Капиталбанк"');
+  assert.deepEqual(state.sources[0].rates, [{ code: 'USD', rate: '12050' }, { code: 'EUR', rate: '13310' }], 'with the rates from the link');
+  assert.equal(state.rateSource, 's1');
+});
+
+test('sources already doubled by name are merged: the one in use stays, else the newest', () => {
+  const kb = (id, rate) => ({ id, name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate }] });
+  const other = { id: 's2', name: 'Малика', quote: 'UZS', rates: [{ code: 'USD', rate: '12800' }] };
+
+  const newest = mergeSameNames([kb('s1', '12990'), other, kb('s3', '12050')], 'market');
+  assert.deepEqual(newest.sources.map(source => source.id), ['s3', 's2'], 'the newer "Капиталбанк" takes the place of the older');
+  assert.equal(newest.rateSource, 'market');
+
+  const used = mergeSameNames([kb('s1', '12990'), other, kb('s3', '12050')], 's1');
+  assert.deepEqual(used.sources.map(source => source.id), ['s1', 's2'], 'the one in use is kept');
+  assert.equal(used.rateSource, 's1');
+
+  const usedNewer = mergeSameNames([kb('s1', '12990'), kb('s3', '12050')], 's3');
+  assert.deepEqual([usedNewer.sources.map(source => source.id), usedNewer.rateSource], [['s3'], 's3']);
+
+  const restored = buildState({ v: 11, list: ['USD'], shop: {}, sources: [kb('s1', '12990'), other, kb('s3', '12050')], rateSource: 's1' });
+  assert.deepEqual(restored.sources.map(source => source.id), ['s1', 's2'], 'on start, from storage');
+  assert.equal(restored.rateSource, 's1');
 });

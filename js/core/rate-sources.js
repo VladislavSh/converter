@@ -60,6 +60,32 @@ export function cleanSources(raw) {
   return sources;
 }
 
+/** Names compare without case and surrounding spaces: "Капиталбанк" = " капиталбанк ". */
+const sameName = (a, b) => cleanName(a).toLocaleLowerCase('ru') === cleanName(b).toLocaleLowerCase('ru');
+
+/**
+ * One source per name. Two sources called the same (a link opened by an
+ * earlier version added a second "Капиталбанк") are merged: the one in use
+ * stays, otherwise the newest one.
+ * @returns {{sources: object[], rateSource: string}}
+ */
+export function mergeSameNames(sources, rateSource) {
+  const kept = [];
+  let inUse = rateSource;
+  for (const source of sources) {
+    const index = kept.findIndex(other => sameName(other.name, source.name));
+    if (index < 0) {
+      kept.push(source);
+    } else if (kept[index].id === rateSource) {
+      if (inUse === source.id) inUse = kept[index].id;
+    } else {
+      if (inUse === kept[index].id) inUse = source.id;
+      kept[index] = source;
+    }
+  }
+  return { sources: kept, rateSource: inUse };
+}
+
 /** Whether the id names a source that exists: market, a bank, or one of the user's. */
 export const isSourceId = (state, id) =>
   id === 'market' || BANK_SOURCES.includes(id) || (state.sources ?? []).some(source => source.id === id);
@@ -139,7 +165,7 @@ function freeId(list) {
  * with an empty rate are skipped. A new source is switched on straight away:
  * it was added to be used.
  * @param {{id?: string, name?: string, quote: string, rates: {code: string, rate: string|number}[]}} draft
- * @returns {{ok: true, id: string}|{ok: false, error: 'quote'|'pair'|'duplicate'|'rate'|'empty'|'full'|'missing', row?: number}}
+ * @returns {{ok: true, id: string}|{ok: false, error: 'quote'|'pair'|'duplicate'|'rate'|'empty'|'name'|'full'|'missing', row?: number}}
  */
 export function saveSource(state, draft) {
   const list = state.sources ?? (state.sources = []);
@@ -159,6 +185,8 @@ export function saveSource(state, draft) {
   }
   if (!rates.length) return { ok: false, error: 'empty' };
   const fields = { name: cleanName(draft.name) || defaultName(rates, quote), quote, rates };
+  // Two sources with one name could not be told apart in the lists
+  if (list.some(other => other.id !== draft.id && sameName(other.name, fields.name))) return { ok: false, error: 'name' };
 
   if (draft.id) {
     const source = list.find(item => item.id === draft.id);
@@ -246,6 +274,13 @@ export function adoptLinkedSource(state, params, isKnown = () => true) {
   if (!draft) return false;
 
   const clean = cleanRates(draft.rates, draft.quote);
+  // A source with this name is the one the link means: its rates are brought up to date
+  const named = (state.sources ?? []).find(source => sameName(source.name, draft.name || ''));
+  if (named) {
+    const outcome = saveSource(state, { ...draft, id: named.id, name: named.name });
+    state.rateSource = outcome.ok ? named.id : 'market';
+    return outcome.ok;
+  }
   const same = (state.sources ?? []).find(source => source.quote === draft.quote && sameRates(source.rates, clean));
   if (same) {
     state.rateSource = same.id;

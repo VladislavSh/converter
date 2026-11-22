@@ -2,7 +2,7 @@
 // migrations between versions. buildState() is pure — storage and browser
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
-import { cleanSources, isSourceId, sourcesFromPairs } from './rate-sources.js';
+import { cleanSources, isSourceId, mergeSameNames, sourcesFromPairs } from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
@@ -126,11 +126,15 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     shop: cleanShop(raw.shop)
   };
   if (isSourceId(state, raw.rateSource)) state.rateSource = raw.rateSource;
+  Object.assign(state, mergeSameNames(state.sources, state.rateSource));
 
   const fromVersion = src ? (Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1) : STATE_VERSION;
   if (src) migrate(state, fromVersion);
   // v11: single custom rates became sources that hold several currencies
-  if (fromVersion < 11 && Array.isArray(raw.customRates)) Object.assign(state, sourcesFromPairs(raw.customRates, raw.rateId));
+  if (fromVersion < 11 && Array.isArray(raw.customRates)) {
+    const converted = sourcesFromPairs(raw.customRates, raw.rateId);
+    Object.assign(state, mergeSameNames(converted.sources, converted.rateSource));
+  }
   if (!state.list.length) state.list = [...DEFAULT_LIST];
   if (!state.list.includes(state.base)) {
     // The typed amount belonged to a currency that is gone: "50 EUR" must not

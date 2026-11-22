@@ -14,7 +14,7 @@ import { $, $$, ICONS, createSheet, escapeHtml } from './dom.js';
 const USUAL_CURRENCIES = ['USD', 'CNY', 'RUB', 'EUR', 'KZT', 'UZS'];
 const ERROR_TEXTS = {
   quote: 'srcQuoteError', pair: 'srcPairError', duplicate: 'srcDupError',
-  rate: 'rateValueError', empty: 'srcEmptyError', full: 'srcFullError'
+  rate: 'rateValueError', empty: 'srcEmptyError', full: 'srcFullError', name: 'srcNameError'
 };
 
 export function createRatesView(app, { onChange }) {
@@ -180,7 +180,8 @@ export function createRatesView(app, { onChange }) {
     if (!outcome.ok) {
       const row = outcome.row ?? -1;
       showError(ERROR_TEXTS[outcome.error] ?? 'rateValueError', { code: quote() }, row);
-      (rowEls()[row]?.querySelector('.src-row__rate') ?? el.rows.querySelector('.src-row__rate'))?.focus();
+      if (outcome.error === 'name') el.name.focus();
+      else (rowEls()[row]?.querySelector('.src-row__rate') ?? el.rows.querySelector('.src-row__rate'))?.focus();
       return;
     }
     const created = !editingId;
