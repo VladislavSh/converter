@@ -89,6 +89,23 @@ function migrate(state, fromVersion) {
 }
 
 /**
+ * Switches delivery off and forgets the parcel (its weight and sizes); the
+ * rates and the rounding stay.
+ */
+export function clearDelivery(shop) {
+  Object.assign(shop, { dlOn: false, dlWeight: '', dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
+}
+
+/**
+ * Delivery starts switched off every time the app opens: a parcel belongs to
+ * one purchase, and most prices are checked without it. A link to a
+ * calculation with delivery (applied after this) switches it back on.
+ */
+export function startWithoutDelivery(state) {
+  clearDelivery(state.shop);
+}
+
+/**
  * Up to 1.10.0 a phone whose browser could not name the sum dropped UZS from
  * the list on every start (the list in the address bar was checked against the
  * browser's names). It is put back once, at its usual place. This runs after

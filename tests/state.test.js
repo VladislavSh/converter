@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildState, SHOP_DEFAULTS, STATE_VERSION } from '../js/core/state.js';
+import { buildState, SHOP_DEFAULTS, STATE_VERSION, startWithoutDelivery } from '../js/core/state.js';
+import { applyDeepLink } from '../js/core/deep-link.js';
 import { moveCurrency, reorderCurrency, switchSource, toggleCurrency } from '../js/core/currency-list.js';
 import { convert } from '../js/core/rates.js';
 
@@ -197,4 +198,20 @@ test('reorderCurrency puts a currency at any place, as dragging does', () => {
     assert.equal(reorderCurrency(state, code, to), false, `${code} → ${to}`);
   }
   assert.deepEqual(state.list, ['CNY', 'UZS', 'USD', 'RUB'], 'refusals change nothing');
+});
+
+test('delivery starts switched off on every start, a link with delivery switches it on', () => {
+  const saved = buildState({}, {});
+  Object.assign(saved.shop, { dlOn: true, dlWeight: '1.2', dlBig: true, dlLen: '40', dlAir: '9.5' });
+  const state = buildState(JSON.parse(JSON.stringify(saved)), {});
+  startWithoutDelivery(state);
+  assert.equal(state.shop.dlOn, false);
+  assert.equal(state.shop.dlWeight, '');
+  assert.equal(state.shop.dlBig, false);
+  assert.equal(state.shop.dlLen, '');
+  assert.equal(state.shop.dlAir, '9.5', 'the rates stay');
+
+  applyDeepLink(state, '?mode=purchase&price=100&cur=CNY&delivery=air&weight=2', () => true);
+  assert.equal(state.shop.dlOn, true);
+  assert.equal(state.shop.dlWeight, '2');
 });

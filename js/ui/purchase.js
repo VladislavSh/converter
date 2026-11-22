@@ -5,6 +5,7 @@ import { formatMoney, formatNumber, plainNumber } from '../core/format.js';
 import { parsePastedAmount, pastedPrice, takeConverterAmount } from '../core/pasted-amount.js';
 import { calcPurchase, parseNumber } from '../core/purchase.js';
 import { breakdownLines, purchaseShareText } from '../core/share-text.js';
+import { clearDelivery } from '../core/state.js';
 import { $, $$, copyText, escapeHtml, setTicking } from './dom.js';
 
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
@@ -411,8 +412,7 @@ export function createPurchaseView(app, { keypad }) {
   el.dlOn.addEventListener('change', () => {
     shop().dlOn = el.dlOn.checked;
     if (!el.dlOn.checked) {
-      // The parcel's own data goes; the rates and the volume settings stay
-      Object.assign(shop(), { dlWeight: '', dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
+      clearDelivery(shop()); // the parcel's own data goes; the rates and the volume settings stay
       for (const input of [el.dlWeight, el.dlLen, el.dlWid, el.dlHei]) input.value = '';
     }
     changed();

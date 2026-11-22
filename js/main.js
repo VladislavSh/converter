@@ -6,7 +6,7 @@ import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
 import { resolveSource, sourceSummary, sourceTable } from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
-import { buildState, restoreDroppedSum } from './core/state.js';
+import { buildState, restoreDroppedSum, startWithoutDelivery } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
 import { loadBankBoard } from './services/bank-rates-api.js';
 import { loadLatestRates } from './services/rates-api.js';
@@ -33,6 +33,7 @@ const state = buildState(saved, {
   language: navigator.language,
   prefersLight: matchMedia('(prefers-color-scheme: light)').matches
 });
+startWithoutDelivery(state);
 // A link to a calculation (?mode=…) wins over what was saved on this device
 applyDeepLink(state, location.search, isKnownCurrency);
 restoreDroppedSum(state, Number.isInteger(saved?.v) ? saved.v : null);

@@ -118,11 +118,21 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     onLanguageChange();
   });
   el.refresh.addEventListener('click', () => onRefresh());
+  // Like in an app: each tab keeps its own scroll position, and tapping the
+  // tab already open scrolls it back to the top.
+  const scrollOf = {};
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   /** Opens a tab; it slides in from the side it is on. */
   function goTo(view) {
-    if (view === app.state.view || !VIEWS.includes(view)) return;
+    if (view === app.state.view) {
+      scrollToTop();
+      return;
+    }
+    if (!VIEWS.includes(view)) return;
     const direction = Math.sign(VIEWS.indexOf(view) - VIEWS.indexOf(app.state.view));
+    scrollOf[app.state.view] = window.scrollY;
     setView(view);
+    window.scrollTo({ top: scrollOf[view] ?? 0, behavior: 'instant' });
     const node = el.views[view];
     node.classList.remove('view-enter-next', 'view-enter-prev');
     void node.offsetWidth; // restart the animation

@@ -76,6 +76,18 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
+/* Scrolling like an app, not a web page: no pull-to-refresh or bounce glow of
+   the browser, smooth jumps, and nothing hidden under the sticky tabs. */
+html {
+  overscroll-behavior-y: none; scroll-behavior: smooth;
+  scroll-padding-top: calc(max(8px, env(safe-area-inset-top)) + 64px); scroll-padding-bottom: 24px;
+  scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
+}
+/* Phones: no scrollbar at all, as in native apps */
+@media (pointer: coarse) {
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+}
 body {
   font-family: var(--font);
   background: var(--bg);
@@ -839,8 +851,19 @@ body.has-keypad .toast { bottom: calc(var(--keypad-h, 380px) + 12px); }
 .splash__bar i { display: block; height: 100%; width: 45%; border-radius: inherit; background: var(--accent); animation: bar 1.25s cubic-bezier(.65, 0, .35, 1) infinite; }
 @keyframes bar { 0% { transform: translateX(-110%); } 100% { transform: translateX(235%); } }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+/* ---------- Scroll-linked motion (browsers that tie animations to scrolling) ---------- */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* The big title fades and shrinks away as the page scrolls, as in iOS apps */
+    .topbar { transform-origin: left center; animation: title-away linear both; animation-timeline: scroll(root); animation-range: 0 90px; }
+    @keyframes title-away { to { opacity: 0; transform: translateY(-10px) scale(.94); } }
+    /* Once the tabs stick to the top, they lift above the content */
+    .views { animation: tabs-lift linear both; animation-timeline: scroll(root); animation-range: 40px 140px; }
+    @keyframes tabs-lift { to { box-shadow: 0 14px 34px -14px rgba(0, 0, 0, .55); } }
+    /* Cards slide up into place as they come into view from below */
+    main .card { animation: card-in linear both; animation-timeline: view(); animation-range: entry 0% entry 70%; }
+    @keyframes card-in { from { opacity: 0; transform: translateY(28px) scale(.97); } }
+  }
 }
 
 /* ---------- Accessibility: the system's "reduce motion" setting ---------- */
