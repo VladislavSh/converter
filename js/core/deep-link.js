@@ -1,10 +1,11 @@
 // Links to a calculation. The whole state of the open tab fits in the query:
 //   ?mode=converter&amount=100&from=USD&list=USD,CNY,UZS,RUB
 //   ?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off
-// With one of the user's own rates switched on, both get &xr=USD-UZS-12950&xrname=…
+// With a rate source other than the market, both get &src=cbu (or a source of
+// one's own: &src=own&srcname=…&srcq=UZS&srcr=USD:12950,CNY:1800).
 // Everything in a link is untrusted: each parameter is validated on its own
 // and a bad one is simply ignored.
-import { activeCustomRate, adoptLinkedRate, customRateParam } from './custom-rates.js';
+import { adoptLinkedSource, sourceParams } from './rate-sources.js';
 import { evaluate, sanitizeExpression } from './expression.js';
 import { isCurrencyCode } from './rates.js';
 import { SHOP_ENUMS } from './state.js';
@@ -70,8 +71,6 @@ function applyPurchase(shop, params) {
     const value = SHOP_ENUMS[field].find(option => option.toLowerCase() === raw.toLowerCase());
     if (value !== undefined && raw !== '') shop[field] = value;
   }
-  const payCard = params.get('paycard');
-  if (payCard === '1' || payCard === '0') shop.dlPayCard = payCard === '1';
   const big = params.get('big');
   if (big === '1' || big === '0') shop.dlBig = big === '1';
 
@@ -81,7 +80,7 @@ function applyPurchase(shop, params) {
     shop.dlMethod = delivery === 'air' ? 'air' : 'auto';
   } else if (delivery === 'off') {
     // The same as turning the switch off in the form: nothing of it is kept
-    Object.assign(shop, { dlOn: false, dlWeight: '', dlPayCard: false, dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
+    Object.assign(shop, { dlOn: false, dlWeight: '', dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
   }
 }
 
@@ -105,7 +104,7 @@ export function applyDeepLink(state, search, isKnown = () => true) {
   if (state.view === 'convert') applyConverter(state, params, isKnown);
   else if (state.view === 'shop') applyPurchase(state.shop, params);
   // The numbers of a link are only the same with the rate it was made with
-  adoptLinkedRate(state, params.get('xr'), params.get('xrname'), code => isCurrencyCode(code) && isKnown(code));
+  adoptLinkedSource(state, params, isKnown);
   return true;
 }
 
@@ -132,7 +131,6 @@ export function buildQuery(state) {
       params.set('air', shop.dlAir);
       params.set('road', shop.dlAuto);
       params.set('step', shop.dlStep);
-      params.set('paycard', shop.dlPayCard ? '1' : '0');
       params.set('big', shop.dlBig ? '1' : '0');
       if (shop.dlBig) {
         params.set('len', shop.dlLen);
@@ -150,12 +148,9 @@ export function buildQuery(state) {
     params.set('from', state.base);
     params.set('list', state.list.join(','));
   }
-  const custom = activeCustomRate(state);
-  if (custom) {
-    params.set('xr', customRateParam(custom));
-    params.set('xrname', custom.name);
-  }
-  return params.toString().replace(/%2C/g, ','); // commas are legal in a query and read better
+  for (const [key, value] of sourceParams(state)) params.set(key, value);
+  // commas and colons are legal in a query and read better unescaped
+  return params.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
 }
 
 /** A full link to the current calculation. */

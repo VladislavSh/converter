@@ -114,18 +114,13 @@ export function calcPurchase(shop, convert) {
   const goodsCharged = goodsInCard + bankFee;
   const goodsBuffer = goodsCharged * bufferPercent / 100;
 
-  // Delivery is a fixed USD bill: a USD card pays it as is; only a UZS card
-  // converts it, and only then does the rate buffer apply.
-  const deliveryInCard = delivery.cost > 0 ? convert(delivery.cost, 'USD', card) : null;
-  const deliveryOnCard = Boolean(shop.dlPayCard) && delivery.cost > 0 && deliveryInCard > 0;
-  const deliverySeparate = delivery.cost > 0 && !deliveryOnCard;
-  const deliveryPart = deliveryOnCard ? deliveryInCard : 0;
-  const deliveryBuffer = deliveryOnCard && card !== 'USD' ? deliveryPart * bufferPercent / 100 : 0;
+  // Delivery is paid apart from the order: to the carrier, in USD
+  const deliverySeparate = delivery.cost > 0;
 
-  const charged = goodsCharged + deliveryPart;
-  const buffer = goodsBuffer + deliveryBuffer;
+  const charged = goodsCharged;
+  const buffer = goodsBuffer;
   const withBuffer = charged + buffer;
-  const hasTopup = hasGoods || deliveryOnCard;
+  const hasTopup = hasGoods;
   const step = card === 'UZS' ? 1000 : 1;
   const topup = hasTopup ? Math.ceil(withBuffer / step - EPSILON) * step : null;
 
@@ -162,7 +157,7 @@ export function calcPurchase(shop, convert) {
     },
     price, feeInCurrency: fee, orderTotal, orderInCard, hasGoods,
     bankFee, goodsCharged,
-    delivery, deliveryOnCard, deliverySeparate, deliveryPart,
+    delivery, deliverySeparate,
     charged, buffer, withBuffer, hasTopup, topup,
     topupAlt: hasTopup ? convert(topup, card, altCurrency) : null,
     split, summary

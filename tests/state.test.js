@@ -31,8 +31,9 @@ test('a current state is restored as it was saved', () => {
   const saved = {
     v: STATE_VERSION, theme: 'light', lang: 'en', view: 'shop',
     list: ['UZS', 'USD', 'KZT'], base: 'KZT', input: '120*3', amountFresh: true,
-    customRates: [{ id: 'r1', name: 'Bank', from: 'USD', to: 'UZS', rate: '12950' }], rateId: 'r1',
-    shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34', dlPayCard: true }
+    sources: [{ id: 's1', name: 'Bank', quote: 'UZS', rates: [{ code: 'USD', rate: '12950' }, { code: 'CNY', rate: '1800' }] }],
+    rateSource: 's1',
+    shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34' }
   };
   assert.deepEqual(buildState(structuredClone(saved)), saved);
 });

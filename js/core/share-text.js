@@ -2,7 +2,6 @@
 // short lines, one emoji per block, the link last on a line of its own so the
 // messenger makes it clickable. Pure functions — sharing itself is in ui/dom.js.
 import { isCrypto } from '../data/currencies.js';
-import { describeCustomRate } from './custom-rates.js';
 import { evaluate } from './expression.js';
 import { formatAmount, formatMoney, formatNumber } from './format.js';
 import { flagCountry } from './names.js';
@@ -24,15 +23,13 @@ const dateTime = (timestamp, locale) => new Date(timestamp).toLocaleString(local
 
 const linkBlock = (t, url) => ['', `🔗 ${t('shareOpen')}`, url];
 
-/** The user's own rate, when one is switched on: the numbers differ from the market. */
-const customRateLine = (customRate, t, locale) => (customRate
-  ? [`📌 ${t('shareCustomRate', { name: customRate.name, rate: describeCustomRate(customRate, locale) })}`]
-  : []);
+/** Which source the numbers come from, when it is not the market. */
+const sourceLine = rateNote => (rateNote ? [`📌 ${rateNote}`] : []);
 
 /**
  * @returns {string|null} null when there is nothing to share (no amount or no rates)
  */
-export function converterShareText({ state, convert, t, locale, ratesAt, customRate, url }) {
+export function converterShareText({ state, convert, t, locale, ratesAt, rateNote, url }) {
   const { base } = state;
   const value = evaluate(state.input);
   if (value == null) return null;
@@ -53,7 +50,7 @@ export function converterShareText({ state, convert, t, locale, ratesAt, customR
 
   const lines = [`${flagEmoji(base)} ${format(value, base)} ${base} =`, '', ...rows];
   const notes = [
-    ...customRateLine(customRate, t, locale),
+    ...sourceLine(rateNote),
     ...(Number.isFinite(ratesAt) ? [`🕒 ${t('shareRatesFrom', { when: dateTime(ratesAt, locale) })}`] : [])
   ];
   if (notes.length) lines.push('', ...notes);
@@ -82,10 +79,6 @@ export function breakdownLines(result, { t, locale }) {
     add(t('shOrder'), `${money(result.orderTotal, currency)}${inCard}`, true);
     if (result.bankPercent > 0) add(t('shBankLine', { p: percent(result.bankPercent) }), `+${money(result.bankFee, card)}`);
   }
-  if (result.deliveryOnCard) {
-    const method = t(result.delivery.method === 'air' ? 'dlAir' : 'dlAuto').toLowerCase();
-    add(t('shDeliveryLine', { method }), `+${money(result.deliveryPart, card)}`);
-  }
   if (result.hasTopup) {
     add(t('shCharged'), `≈ ${money(result.charged, card)}`, true);
     if (result.buffer > 0) add(t('shBufLine', { p: percent(result.bufferPercent) }), `+${money(result.buffer, card)}`);
@@ -97,7 +90,7 @@ export function breakdownLines(result, { t, locale }) {
  * @param {object} options.result  what calcPurchase() returned
  * @returns {string|null} null when there is nothing to share (no price and no delivery)
  */
-export function purchaseShareText({ result, convert, t, locale, customRate, url }) {
+export function purchaseShareText({ result, convert, t, locale, rateNote, url }) {
   const { delivery, card, summary } = result;
   if (!result.hasTopup && !(delivery.cost > 0)) return null;
   const money = (value, code) => `${formatMoney(value, code, locale)} ${code}`;
@@ -134,7 +127,7 @@ export function purchaseShareText({ result, convert, t, locale, customRate, url 
     cnyUzs == null ? '' : `1 CNY = ${formatMoney(cnyUzs, 'CNY', locale)} UZS`
   ].filter(Boolean);
   if (rates.length) lines.push(`📊 ${rates.join(' · ')}`);
-  lines.push(...customRateLine(customRate, t, locale));
+  lines.push(...sourceLine(rateNote));
 
   return [...lines, ...linkBlock(t, url)].join('\n');
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   bankDate, bankNumber, parseCbu, parseNbu, restoreBankCache, shownBankCodes
 } from '../js/core/bank-rates.js';
-import { activeCustomRate, useNamedRate, withCustomRate } from '../js/core/custom-rates.js';
+import { bankSource, resolveSource, selectSource, sourceTable } from '../js/core/rate-sources.js';
 import { applyDeepLink, buildQuery } from '../js/core/deep-link.js';
 import { convert } from '../js/core/rates.js';
 import { buildState } from '../js/core/state.js';
@@ -90,24 +90,28 @@ test('which currencies are shown: the user\'s list, the usual ones, then everyth
   assert.deepEqual(shownBankCodes(rates, [], true), { codes: ['USD', 'RUB', 'CNY', 'KZT', 'VND'], hidden: 0 });
 });
 
-test('"Use": a bank rate becomes the rate of every calculation, updated rather than duplicated', () => {
+test('a bank is a whole source: all its rates go into the calculations at once', () => {
+  const MARKET = { USD: 1, CNY: 7, UZS: 12000, RUB: 80, KZT: 500, VND: 26000 };
+  const banks = { cbu: { ...parseCbu(CBU), ts: 1 }, nbu: null };
   const state = buildState(null);
-  assert.deepEqual(useNamedRate(state, { name: 'ЦБ', from: 'USD', to: 'UZS', rate: 12004.48 }), { ok: true, id: 'r1' });
-  assert.equal(activeCustomRate(state).rate, '12004.48');
+  assert.equal(selectSource(state, 'cbu'), true);
+  const { kind, source, missing } = resolveSource(state, banks);
+  assert.deepEqual([kind, missing, source.quote, source.date], ['bank', false, 'UZS', '21.11.2026']);
+  assert.deepEqual(source.rates.find(entry => entry.code === 'VND'), { code: 'VND', rate: 0.465 }, 'per one dong');
 
-  state.rateId = ''; // back to the market rates
-  useNamedRate(state, { name: 'ЦБ', from: 'USD', to: 'UZS', rate: 12037.32 }); // the next day
-  assert.equal(state.customRates.length, 1, 'the same name and pair is updated');
-  assert.equal(state.rateId, 'r1');
-  assert.equal(activeCustomRate(state).rate, '12037.32');
+  const table = sourceTable(MARKET, source);
+  const cv = (value, from, to) => convert(table, value, from, to);
+  assert.equal(cv(100, 'USD', 'UZS'), 1200448, 'the CBU dollar');
+  assert.ok(Math.abs(cv(1, 'CNY', 'UZS') - 1797.29) < 1e-6, 'the CBU yuan');
+  assert.ok(Math.abs(cv(1, 'RUB', 'UZS') - 146.56) < 1e-6, 'the CBU rouble');
+  assert.ok(Math.abs(cv(1, 'USD', 'CNY') - 12004.48 / 1797.29) < 1e-9, 'dollar to yuan through the CBU sum');
 
-  useNamedRate(state, { name: 'ЦБ', from: 'CNY', to: 'UZS', rate: 1797.29 });
-  useNamedRate(state, { name: 'НБУ, продажа', from: 'USD', to: 'UZS', rate: 12060 });
-  assert.deepEqual(state.customRates.map(entry => `${entry.name} ${entry.from}`), ['ЦБ USD', 'ЦБ CNY', 'НБУ, продажа USD']);
-
-  const table = withCustomRate({ USD: 1, CNY: 7, UZS: 12000 }, activeCustomRate(state));
-  assert.equal(convert(table, 100, 'USD', 'UZS'), 1206000, 'calculations now run on the NBU sell price');
-  assert.equal(useNamedRate(state, { name: 'ЦБ', from: 'USD', to: 'UZS', rate: 0 }).ok, false);
+  // The National Bank's source is its sell price; not loaded yet → market rates meanwhile
+  selectSource(state, 'nbu');
+  assert.equal(resolveSource(state, banks).missing, true);
+  const nbu = bankSource('nbu', { ts: 1, date: '22.11.2026', rates: [{ code: 'USD', nominal: 1, buy: 11950, sell: 12060 }] });
+  assert.deepEqual(nbu.rates, [{ code: 'USD', rate: 12060 }]);
+  assert.equal(convert(sourceTable(MARKET, nbu), 100, 'USD', 'UZS'), 1206000, 'buying dollars at the bank');
 });
 
 test('the Banks tab has its own link', () => {

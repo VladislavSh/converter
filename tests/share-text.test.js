@@ -112,15 +112,7 @@ test('purchase: fee, bank fee and delivery paid separately', () => {
   assert.match(text, /\n🚚 Доставка, авиа, 0,4 кг: 4,00 USD \(оплата отдельно\)\n/);
   assert.match(text, /\n💳 Пополнить карту: 69,00 USD ≈ 828 000 UZS\n/);
   assert.match(text, /\n🧾 Всего понадобится: 73,00 USD ≈ 876 000 UZS\n/, '69 + 4');
-  assert.match(text, /delivery=air&weight=0\.34&unit=kg&air=10&road=6&step=0\.1&paycard=0&big=0$/);
-});
-
-test('purchase: delivery on the same card goes into the breakdown', () => {
-  const text = purchaseText({ price: '150', dlOn: true, dlWeight: '0.34', dlPayCard: true });
-  assert.match(text, /\nДоставка \(авиа\): \+4,00 USD\n/);
-  assert.match(text, /\n💳 Пополнить карту: 27,00 USD/);
-  assert.equal(text.includes('🧾'), false, 'one payment: no separate total');
-  assert.equal(text.includes('оплата отдельно'), false);
+  assert.match(text, /delivery=air&weight=0\.34&unit=kg&air=10&road=6&step=0\.1&big=0$/);
 });
 
 test('purchase: delivery alone, and English', () => {
@@ -138,7 +130,7 @@ test('purchase: nothing to share without a price and delivery', () => {
 });
 
 test('the message is ready for a chat: short lines, a link that opens the same numbers', () => {
-  const shop = { price: '450', bankPct: '1.5', card: 'UZS', dlOn: true, dlWeight: '2', dlPayCard: true };
+  const shop = { price: '450', bankPct: '1.5', card: 'UZS', dlOn: true, dlWeight: '2' };
   const text = purchaseText(shop);
   const lines = text.split('\n');
   assert.ok(lines.slice(0, -1).every(line => line.length <= 60), 'every line of text fits a phone screen');

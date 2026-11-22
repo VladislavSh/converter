@@ -35,7 +35,6 @@ export function createPurchaseView(app, { keypad }) {
     dlAir: $('#dl-air'),
     dlAuto: $('#dl-auto'),
     dlStep: $('#dl-step'),
-    dlPayCard: $('#dl-paycard'),
     dlBig: $('#dl-big'),
     dlBigBody: $('#dl-big-body'),
     dlBigNote: $('#dl-big-note'),
@@ -87,7 +86,6 @@ export function createPurchaseView(app, { keypad }) {
       button.setAttribute('aria-pressed', String(active));
     }
     el.dlOn.checked = s.dlOn;
-    el.dlPayCard.checked = s.dlPayCard;
     el.dlBig.checked = s.dlBig;
     el.dlBigBody.hidden = !s.dlBig;
     const freeKg = parseNumber(s.dlVolFree);
@@ -342,7 +340,7 @@ export function createPurchaseView(app, { keypad }) {
       convert: app.convert,
       t: app.t,
       locale: app.locale(),
-      customRate: app.customRate(),
+      rateNote: app.rateNote(),
       url: app.link()
     });
     if (text) app.share(text);
@@ -365,12 +363,11 @@ export function createPurchaseView(app, { keypad }) {
     shop().dlOn = el.dlOn.checked;
     if (!el.dlOn.checked) {
       // The parcel's own data goes; the rates and the volume settings stay
-      Object.assign(shop(), { dlWeight: '', dlPayCard: false, dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
+      Object.assign(shop(), { dlWeight: '', dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
       for (const input of [el.dlWeight, el.dlLen, el.dlWid, el.dlHei]) input.value = '';
     }
     changed();
   });
-  el.dlPayCard.addEventListener('change', () => { shop().dlPayCard = el.dlPayCard.checked; changed(); });
   el.dlBig.addEventListener('change', () => { shop().dlBig = el.dlBig.checked; changed(); });
 
   return { render, takeAmount };

@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.12.0"></script>
-  <script src="js/boot-guard.js?v=1.12.0"></script>
-  <script src="js/install-early.js?v=1.12.0"></script>
+  <script src="js/theme-init.js?v=1.13.0"></script>
+  <script src="js/boot-guard.js?v=1.13.0"></script>
+  <script src="js/install-early.js?v=1.13.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.12.0">
+  <link rel="stylesheet" href="css/style.css?v=1.13.0">
 </head>
 <body>
 
@@ -264,11 +264,6 @@
               </select>
             </div>
           </div>
-          <label class="check-row">
-            <input type="checkbox" id="dl-paycard">
-            <span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
-            <span data-i18n="dlPayCard">Оплачиваю доставку этой же картой</span>
-          </label>
           <div class="result__rows dl-res" id="dl-break"></div>
         </div>
       </div>
@@ -307,6 +302,7 @@
           <div>
             <h2 class="card__title" data-i18n="bankCbu">ЦБ Узбекистана</h2>
             <p class="bank__sub" id="bank-cbu-sub"></p>
+            <div id="bank-cbu-use"></div>
           </div>
           <a class="link-btn" id="bank-cbu-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite">Сайт банка</a>
         </div>
@@ -317,6 +313,7 @@
           <div>
             <h2 class="card__title" data-i18n="bankNbu">Национальный банк (НБУ)</h2>
             <p class="bank__sub" id="bank-nbu-sub"></p>
+            <div id="bank-nbu-use"></div>
           </div>
           <a class="link-btn" id="bank-nbu-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite">Сайт банка</a>
         </div>
@@ -381,17 +378,17 @@
   <div class="sheet__panel sheet__panel--fit" role="dialog" aria-modal="true" aria-labelledby="rate-title">
     <div class="sheet__grab" aria-hidden="true"></div>
     <div class="sheet__head">
-      <h2 id="rate-title" data-i18n="ratesTitle">Курсы</h2>
+      <h2 id="rate-title" data-i18n="ratesTitle">Источник курсов</h2>
       <button type="button" class="icon-btn" data-close data-i18n-aria="close" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
     </div>
     <div id="rate-pick">
-      <p class="guide__lead" data-i18n="rateLead">Выбранный курс работает во всех расчётах: и в конвертере, и в покупке.</p>
+      <p class="guide__lead" data-i18n="rateLead">Все расчёты идут по курсам выбранного источника.</p>
       <ul class="rate-list" id="rate-list" role="radiogroup" aria-labelledby="rate-title"></ul>
       <button type="button" class="ghost-btn rate-add" id="rate-add">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        <span data-i18n="rateAdd">Добавить свой курс</span>
+        <span data-i18n="rateAdd">Добавить свой источник</span>
       </button>
     </div>
     <form id="rate-form" novalidate hidden>
@@ -399,19 +396,22 @@
         <label for="rate-name" data-i18n="rateName">Название</label>
         <input id="rate-name" type="text" maxlength="30" autocomplete="off" enterkeyhint="next" data-i18n-ph="rateNamePh" placeholder="Например, Капиталбанк">
       </div>
+      <div class="field field--gap src-quote">
+        <label for="rate-quote" data-i18n="srcQuote">Курсы указаны в</label>
+        <select id="rate-quote"></select>
+      </div>
       <div class="field field--gap">
-        <label for="rate-value" data-i18n="rateValue">Курс</label>
-        <div class="rate-pair">
-          <span class="rate-pair__sign">1</span>
-          <select id="rate-from" data-i18n-aria="rateFromLabel" aria-label="За одну единицу этой валюты"></select>
-          <span class="rate-pair__sign">=</span>
-          <input id="rate-value" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="done" placeholder="0">
-          <select id="rate-to" data-i18n-aria="rateToLabel" aria-label="дают столько этой валюты"></select>
+        <span class="field__label" data-i18n="srcRates">Курсы валют</span>
+        <div class="src-rows" id="rate-rows"></div>
+        <div class="src-tools">
+          <button type="button" class="link-btn" id="rate-add-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="srcAddRow">Добавить валюту</span>
+          </button>
+          <button type="button" class="link-btn" id="rate-fill" data-i18n="srcFill">Подставить рыночные</button>
         </div>
       </div>
-      <div class="rate-market">
-        <span id="rate-market"></span>
-        <button type="button" class="link-btn" id="rate-use-market" data-i18n="rateUseMarket">Подставить</button>
+      <p class="card__note" data-i18n="srcHint">Пустые поля не сохраняются. Валюты, которых нет в источнике, считаются по рынку.</p>
       </div>
       <p class="rate-error" id="rate-error" role="alert" hidden></p>
       <div class="rate-actions">
@@ -474,6 +474,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.12.0"></script>
+<script type="module" src="js/main.js?v=1.13.0"></script>
 </body>
 </html>

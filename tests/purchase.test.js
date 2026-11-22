@@ -204,14 +204,6 @@ test('delivery only, paid separately: nothing to top up', () => {
   assert.deepEqual(r.summary, { showParts: true, needUsd: 4, needUzs: 48000, exactUsd: 4, leftover: 0 });
 });
 
-test('delivery only, paid with a USD card: exact amount, no rate buffer', () => {
-  const r = calcPurchase(shop({ dlOn: true, dlWeight: '0.34', dlPayCard: true }), cv);
-  assert.equal(r.deliveryOnCard, true);
-  assert.equal(r.buffer, 0, 'delivery is billed in USD, a USD card converts nothing');
-  assert.equal(r.topup, 4);
-  assert.equal(r.summary, null);
-});
-
 test('goods and delivery, delivery paid separately: the lines add up', () => {
   const r = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '0.34' }), cv);
   assert.equal(r.topup, 22);
@@ -222,31 +214,24 @@ test('goods and delivery, delivery paid separately: the lines add up', () => {
   close(r.summary.leftover, 22 - 150 / 7);
 });
 
-test('goods and delivery on one USD card', () => {
-  const r = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '0.34', dlPayCard: true }), cv);
-  close(r.charged, 150 / 7 + 4);
-  close(r.buffer, 150 / 7 * 0.02, 'the buffer covers the goods only');
-  assert.equal(r.topup, 26);
-  assert.equal(r.deliverySeparate, false);
-});
-
-test('goods and delivery on one UZS card: both are converted, both get the buffer', () => {
-  const r = calcPurchase(shop({ price: '150', card: 'UZS', dlOn: true, dlWeight: '0.34', dlPayCard: true }), cv);
-  const charged = 150 / 7 * 12000 + 48000;
-  close(r.charged, charged);
-  close(r.buffer, charged * 0.02);
-  assert.equal(r.topup, 312000, 'rounded up to 1 000 sum');
-  assert.equal(r.topup % 1000, 0);
+test('delivery never goes onto the card: the card is topped up for the goods only', () => {
+  const r = calcPurchase(shop({ price: '150', card: 'UZS', dlOn: true, dlWeight: '0.34' }), cv);
+  close(r.charged, 150 / 7 * 12000, 'the goods alone');
+  close(r.buffer, 150 / 7 * 12000 * 0.02);
+  assert.equal(r.topup, 263000, 'rounded up to 1 000 sum');
+  assert.equal(r.deliverySeparate, true);
+  assert.equal(r.summary.needUsd, 263000 / 12000 + 4, 'delivery is added to the total needed');
+  assert.equal('deliveryOnCard' in r, false, 'the old "pay delivery by card" field is gone');
 });
 
 test('switching delivery off removes it from every total', () => {
-  const on = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '2', dlPayCard: true }), cv);
-  const off = calcPurchase(shop({ price: '150', dlOn: false, dlWeight: '2', dlPayCard: true }), cv);
-  assert.ok(on.topup > off.topup);
+  const on = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '2' }), cv);
+  const off = calcPurchase(shop({ price: '150', dlOn: false, dlWeight: '2' }), cv);
+  assert.equal(on.summary.needUsd, 22 + 20);
   assert.equal(off.topup, 22);
-  assert.equal(off.deliveryOnCard, false);
   assert.equal(off.deliverySeparate, false);
   assert.equal(off.delivery.cost, 0);
+  assert.equal(off.summary.showParts, false, 'no delivery line in the total');
 });
 
 test('a price in dollars still uses the yuan fee rule', () => {
@@ -281,11 +266,10 @@ test('empty, zero, negative and junk prices produce no goods', () => {
 });
 
 test('without rates nothing is invented', () => {
-  const r = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '1', dlPayCard: true }), noRates);
+  const r = calcPurchase(shop({ price: '150', dlOn: true, dlWeight: '1' }), noRates);
   assert.equal(r.hasGoods, false);
   assert.equal(r.topup, null);
   assert.equal(r.topupAlt, null);
-  assert.equal(r.deliveryOnCard, false, 'cannot be put on the card without a rate');
   assert.equal(r.delivery.cost, 10, 'delivery itself is in USD and needs no rate');
   assert.equal(r.summary.needUsd, 10);
   assert.equal(r.summary.needUzs, null);

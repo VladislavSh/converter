@@ -84,6 +84,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
 
   function setView(view) {
     app.state.view = VIEWS.includes(view) ? view : 'convert';
+    document.body.dataset.view = app.state.view; // the Banks tab hides the "Rate" bar
     el.tabs.forEach(tab => {
       const active = tab.dataset.view === app.state.view;
       tab.classList.toggle('is-active', active);

@@ -2,11 +2,11 @@
 // migrations between versions. buildState() is pure — storage and browser
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
-import { cleanCustomRates } from './custom-rates.js';
+import { cleanSources, isSourceId, sourcesFromPairs } from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
-export const STATE_VERSION = 10;
+export const STATE_VERSION = 11;
 
 /** The tabs: converter, purchase, banks. */
 export const VIEWS = Object.freeze(['convert', 'shop', 'banks']);
@@ -17,7 +17,7 @@ export const SHOP_DEFAULTS = Object.freeze({
   svcPct: '3', freeBelow: '0', svcMin: '2', bankPct: '0', bufPct: '2',
   dlOn: false, dlMethod: 'air', dlWeight: '', dlUnit: 'kg',
   // Published cargo rates China → Uzbekistan (air 9.9 $/kg, road 6 $/kg); all editable
-  dlAir: '9.9', dlAuto: '6', dlStep: '0.1', dlPayCard: false,
+  dlAir: '9.9', dlAuto: '6', dlStep: '0.1',
   // Oversized parcels: volumetric weight = L × W × H (cm) / divisor, counted
   // only for parcels heavier than dlVolFree kg (the carrier's rule: up to 15 kg
   // the box size does not matter)
@@ -35,7 +35,7 @@ export const SHOP_ENUMS = {
   dlUnit: ['g', 'kg'],
   dlStep: ['0.1', '0.5', '1', '0']
 };
-const SHOP_FLAGS = ['dlOn', 'dlPayCard', 'dlBig'];
+const SHOP_FLAGS = ['dlOn', 'dlBig'];
 const MAX_TEXT = 60;
 
 // The default list before v7; those two extra entries are dropped on upgrade.
@@ -120,14 +120,17 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     input: cleanText(raw.input, '100'),
     // the amount was typed on the main screen and "Purchase" has not taken it yet
     amountFresh: raw.amountFresh === true,
-    // the user's own exchange rates and the one switched on ('' = market rates)
-    customRates: cleanCustomRates(raw.customRates),
-    rateId: '',
+    // where the rates come from: 'market', 'cbu', 'nbu' or a source of the user's own
+    sources: cleanSources(raw.sources),
+    rateSource: 'market',
     shop: cleanShop(raw.shop)
   };
-  if (state.customRates.some(entry => entry.id === raw.rateId)) state.rateId = raw.rateId;
+  if (isSourceId(state, raw.rateSource)) state.rateSource = raw.rateSource;
 
-  if (src) migrate(state, Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1);
+  const fromVersion = src ? (Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1) : STATE_VERSION;
+  if (src) migrate(state, fromVersion);
+  // v11: single custom rates became sources that hold several currencies
+  if (fromVersion < 11 && Array.isArray(raw.customRates)) Object.assign(state, sourcesFromPairs(raw.customRates, raw.rateId));
   if (!state.list.length) state.list = [...DEFAULT_LIST];
   if (!state.list.includes(state.base)) {
     // The typed amount belonged to a currency that is gone: "50 EUR" must not

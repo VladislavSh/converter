@@ -1,66 +1,76 @@
-// "Rate" bar under the tabs and its sheet: the market rates or one of the
-// user's own, saved under a name ("Kapitalbank", "Malika market"). The rate
-// that is switched on is used by both tabs.
+// "Rate" bar under the tabs and its sheet: which source every calculation
+// uses — the market rates, a bank (the Central Bank, the National Bank) or a
+// source of the user's own with the rates of several currencies. The logic is
+// in core/rate-sources.js.
 import {
-  MAX_CUSTOM_RATES, activeCustomRate, describeCustomRate, rateDifference, rateValue,
-  removeCustomRate, saveCustomRate, selectCustomRate
-} from '../core/custom-rates.js';
+  BANK_SOURCES, DEFAULT_QUOTE, MAX_SOURCES, MAX_SOURCE_RATES,
+  removeSource, saveSource, selectSource, sourceSummary
+} from '../core/rate-sources.js';
 import { sanitizeExpression } from '../core/expression.js';
-import { formatAmount, formatNumber } from '../core/format.js';
+import { formatAmount } from '../core/format.js';
 import { $, $$, ICONS, createSheet, escapeHtml } from './dom.js';
 
 // Offered in the form besides the currencies of the main list
-const USUAL_CURRENCIES = ['USD', 'UZS', 'CNY', 'RUB'];
-const MIN_DIFFERENCE = 0.05; // percent; closer than that reads as "same as the market"
+const USUAL_CURRENCIES = ['USD', 'CNY', 'RUB', 'EUR', 'KZT', 'UZS'];
+const BANK_NAMES = { cbu: 'bankCbu', nbu: 'bankNbuSell' };
+const ERROR_TEXTS = {
+  quote: 'srcQuoteError', pair: 'srcPairError', duplicate: 'srcDupError',
+  rate: 'rateValueError', empty: 'srcEmptyError', full: 'srcFullError'
+};
 
 export function createRatesView(app, { onChange }) {
   const el = {
     bar: $('#rate-bar'),
     barName: $('#rate-bar-name'),
     barValue: $('#rate-bar-value'),
-    sheet: $('#rate-sheet'),
     title: $('#rate-title'),
     pick: $('#rate-pick'),
     list: $('#rate-list'),
     add: $('#rate-add'),
     form: $('#rate-form'),
     name: $('#rate-name'),
-    from: $('#rate-from'),
-    to: $('#rate-to'),
-    value: $('#rate-value'),
-    market: $('#rate-market'),
-    useMarket: $('#rate-use-market'),
+    quote: $('#rate-quote'),
+    rows: $('#rate-rows'),
+    addRow: $('#rate-add-row'),
+    fill: $('#rate-fill'),
     error: $('#rate-error'),
     cancel: $('#rate-cancel')
   };
-  const sheet = createSheet(el.sheet, $('#app'));
-  let editingId = ''; // '' while a new rate is being added
+  const sheet = createSheet($('#rate-sheet'), $('#app'));
+  let editingId = ''; // '' while a new source is being added
 
-  const rates = () => app.state.customRates;
+  const own = () => app.state.sources;
+  const hasRate = code => app.marketConvert(1, 'USD', code) != null;
+
+  function sourceName(id) {
+    if (id === 'market') return app.t('rateMarket');
+    if (BANK_SOURCES.includes(id)) return app.t(BANK_NAMES[id]);
+    return own().find(source => source.id === id)?.name ?? '';
+  }
+
+  /** "Official rates for 21.11.2026", "Loading…" or "Not loaded". */
+  function bankNote(bank) {
+    const board = app.banks[bank];
+    if (board) return app.t(bank === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
+    return app.t(app.bankStatus[bank] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
+  }
 
   // ---------- the bar ----------
 
   function renderBar() {
-    const custom = activeCustomRate(app.state);
-    el.bar.classList.toggle('is-custom', Boolean(custom));
-    el.barName.textContent = custom ? custom.name : app.t('rateMarket');
-    el.barValue.textContent = custom ? describeCustomRate(custom, app.locale()) : '';
+    const info = app.rateSource();
+    el.bar.classList.toggle('is-custom', info.kind !== 'market');
+    el.barName.textContent = sourceName(info.id);
+    let value = '';
+    if (info.kind === 'bank') value = info.missing ? app.t('srcNotLoaded') : app.t('srcOnDate', { date: info.source.date });
+    else if (info.kind === 'own') value = sourceSummary(info.source, app.locale(), 1);
+    el.barValue.textContent = value;
   }
 
   // ---------- the list ----------
 
-  /** "1 USD = 12 950 UZS · 1,1% above the market" */
-  function rateNote(custom) {
-    const text = describeCustomRate(custom, app.locale());
-    const difference = app.rates ? rateDifference(app.rates.rates, custom) : null;
-    if (difference == null) return text;
-    if (Math.abs(difference) < MIN_DIFFERENCE) return `${text} · ${app.t('rateSame')}`;
-    const percent = formatNumber(Math.abs(difference), app.locale(), Math.abs(difference) < 10 ? 1 : 0);
-    return `${text} · ${app.t(difference > 0 ? 'rateAbove' : 'rateBelow', { p: percent })}`;
-  }
-
-  function itemHtml({ id, name, note, actions }) {
-    const active = app.state.rateId === id;
+  function itemHtml({ id, name, note, editable }) {
+    const active = app.state.rateSource === id;
     return `
       <li class="rate-item${active ? ' is-on' : ''}">
         <button type="button" class="rate-item__main" role="radio" aria-checked="${active}" data-id="${id}">
@@ -70,18 +80,21 @@ export function createRatesView(app, { onChange }) {
             <span class="rate-item__note">${escapeHtml(note)}</span>
           </span>
         </button>
-        ${actions ? `
-          <button type="button" class="rate-item__act" data-edit="${id}" aria-label="${escapeHtml(app.t('rateEditOne', { name }))}">${ICONS.edit}</button>
-          <button type="button" class="rate-item__act" data-delete="${id}" aria-label="${escapeHtml(app.t('rateDeleteOne', { name }))}">${ICONS.trash}</button>` : ''}
+        ${editable ? `
+          <button type="button" class="rate-item__act" data-edit="${id}" aria-label="${escapeHtml(app.t('srcEditOne', { name }))}">${ICONS.edit}</button>
+          <button type="button" class="rate-item__act" data-delete="${id}" aria-label="${escapeHtml(app.t('srcDeleteOne', { name }))}">${ICONS.trash}</button>` : ''}
       </li>`;
   }
 
   function renderList() {
     el.list.innerHTML = [
-      itemHtml({ id: '', name: app.t('rateMarket'), note: app.t('rateMarketNote'), actions: false }),
-      ...rates().map(custom => itemHtml({ id: custom.id, name: custom.name, note: rateNote(custom), actions: true }))
+      itemHtml({ id: 'market', name: app.t('rateMarket'), note: app.t('rateMarketNote') }),
+      ...BANK_SOURCES.map(bank => itemHtml({ id: bank, name: sourceName(bank), note: bankNote(bank) })),
+      ...own().map(source => itemHtml({
+        id: source.id, name: source.name, note: sourceSummary(source, app.locale(), 3), editable: true
+      }))
     ].join('');
-    el.add.hidden = rates().length >= MAX_CUSTOM_RATES;
+    el.add.hidden = own().length >= MAX_SOURCES;
   }
 
   function showList() {
@@ -92,47 +105,73 @@ export function createRatesView(app, { onChange }) {
     renderList();
   }
 
-  // ---------- the form ----------
+  // ---------- the form: a name, a quote currency and rows of rates ----------
 
-  const hasRate = code => app.marketConvert(1, 'USD', code) != null;
+  const rowEls = () => $$('[data-row]', el.rows);
+  const quote = () => el.quote.value;
 
-  function fillCurrencies(select, chosen) {
-    const codes = [...new Set([chosen, ...USUAL_CURRENCIES, ...app.state.list])]
-      .filter(code => code === chosen || !app.rates || hasRate(code));
-    select.innerHTML = codes.map(code => `<option value="${code}">${code}</option>`).join('');
-    select.value = chosen;
+  function currencyOptions(chosen) {
+    return [...new Set([chosen, ...USUAL_CURRENCIES, ...app.state.list])]
+      .filter(code => code && (code === chosen || !app.rates || hasRate(code)))
+      .map(code => `<option value="${code}"${code === chosen ? ' selected' : ''}>${code}</option>`)
+      .join('');
   }
 
-  const marketRate = () => app.marketConvert(1, el.from.value, el.to.value);
-
-  function renderMarketHint() {
-    const market = marketRate();
-    const known = market != null && el.from.value !== el.to.value;
-    el.market.textContent = known
-      ? app.t('rateMarketNow', { rate: `1 ${el.from.value} = ${formatAmount(market, el.to.value, { locale: app.locale() })} ${el.to.value}` })
-      : '';
-    el.useMarket.hidden = !known;
+  /** The market rate as a hint inside each empty field. */
+  function marketHint(code) {
+    const market = app.marketConvert(1, code, quote());
+    return market == null ? '0' : formatAmount(market, quote(), { plain: true });
   }
 
-  function showError(key) {
-    el.error.textContent = key ? app.t(key, { n: MAX_CUSTOM_RATES }) : '';
+  function refreshRows() {
+    for (const row of rowEls()) {
+      $('.src-row__quote', row).textContent = quote();
+      $('.src-row__rate', row).placeholder = marketHint($('.src-row__code', row).value);
+    }
+    el.addRow.hidden = rowEls().length >= MAX_SOURCE_RATES;
+  }
+
+  /** The next currency to offer: one of the usual ones not used yet. */
+  function nextCode() {
+    const used = rowEls().map(row => $('.src-row__code', row).value);
+    return [...USUAL_CURRENCIES, ...app.state.list].find(code => code !== quote() && !used.includes(code)) ?? 'USD';
+  }
+
+  function addRow(code = nextCode(), rate = '') {
+    const row = document.createElement('div');
+    row.className = 'src-row';
+    row.dataset.row = '';
+    row.innerHTML = `
+      <span class="src-row__sign">1</span>
+      <select class="src-row__code" aria-label="${escapeHtml(app.t('srcCurrency'))}">${currencyOptions(code)}</select>
+      <span class="src-row__sign">=</span>
+      <input class="src-row__rate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="${escapeHtml(app.t('rateValue'))}">
+      <span class="src-row__quote"></span>
+      <button type="button" class="src-row__remove" data-remove aria-label="${escapeHtml(app.t('srcRemoveRow'))}">${ICONS.close}</button>`;
+    $('.src-row__rate', row).value = rate;
+    el.rows.append(row);
+    refreshRows();
+    return row;
+  }
+
+  const readRows = () => rowEls().map(row => ({ code: $('.src-row__code', row).value, rate: $('.src-row__rate', row).value }));
+
+  function showError(key, vars = {}, row = -1) {
+    el.error.textContent = key ? app.t(key, { n: MAX_SOURCES, ...vars }) : '';
     el.error.hidden = !key;
+    rowEls().forEach((item, index) => item.classList.toggle('is-error', index === row));
   }
 
-  /** @param {object} [custom] a saved rate to change; none = a new one */
-  function showForm(custom) {
-    editingId = custom?.id ?? '';
-    // A new rate starts as "dollar in sums", or the first two listed currencies
-    const [first, second] = app.state.list;
-    const from = custom?.from ?? (hasRate('USD') || !app.rates ? 'USD' : first);
-    const to = custom?.to ?? (from !== 'UZS' && (hasRate('UZS') || !app.rates) ? 'UZS' : (second ?? first));
-    el.name.value = custom?.name ?? '';
-    fillCurrencies(el.from, from);
-    fillCurrencies(el.to, to);
-    el.value.value = custom?.rate ?? '';
+  /** @param {object} [source] a saved source to change; none = a new one */
+  function showForm(source) {
+    editingId = source?.id ?? '';
+    el.name.value = source?.name ?? '';
+    el.quote.innerHTML = currencyOptions(source?.quote ?? DEFAULT_QUOTE);
+    el.rows.innerHTML = '';
+    if (source) source.rates.forEach(entry => addRow(entry.code, entry.rate));
+    else ['USD', 'CNY'].filter(code => code !== quote()).forEach(code => addRow(code));
     showError('');
-    renderMarketHint();
-    el.title.textContent = app.t(custom ? 'rateEditTitle' : 'rateNewTitle');
+    el.title.textContent = app.t(source ? 'srcEditTitle' : 'srcNewTitle');
     el.pick.hidden = true;
     el.form.hidden = false;
     // On touch screens the keyboard would cover half the form before it is read
@@ -140,29 +179,25 @@ export function createRatesView(app, { onChange }) {
   }
 
   function submitForm() {
-    const outcome = saveCustomRate(app.state, {
-      id: editingId || undefined,
-      name: el.name.value,
-      from: el.from.value,
-      to: el.to.value,
-      rate: el.value.value
+    const outcome = saveSource(app.state, {
+      id: editingId || undefined, name: el.name.value, quote: quote(), rates: readRows()
     });
     if (!outcome.ok) {
-      showError({ pair: 'ratePairError', rate: 'rateValueError', full: 'rateFullError' }[outcome.error] ?? 'rateValueError');
-      (outcome.error === 'pair' ? el.to : el.value).focus();
+      const row = outcome.row ?? -1;
+      showError(ERROR_TEXTS[outcome.error] ?? 'rateValueError', { code: quote() }, row);
+      (rowEls()[row]?.querySelector('.src-row__rate') ?? el.rows.querySelector('.src-row__rate'))?.focus();
       return;
     }
     const created = !editingId;
     app.save();
     onChange();
-    renderBar();
     if (created) {
-      // A new rate is switched on straight away: back to the numbers
+      // A new source is switched on straight away: back to the numbers
       sheet.close();
-      app.toast(app.t('rateSavedOn', { name: activeCustomRate(app.state).name }));
+      app.toast(app.t('srcSavedOn', { name: sourceName(outcome.id) }));
     } else {
       showList();
-      app.toast(app.t('rateSaved'));
+      app.toast(app.t('srcSaved'));
     }
   }
 
@@ -178,24 +213,22 @@ export function createRatesView(app, { onChange }) {
     const remove = event.target.closest('[data-delete]');
     const choose = event.target.closest('[data-id]');
     if (edit) {
-      showForm(rates().find(custom => custom.id === edit.dataset.edit));
+      showForm(own().find(source => source.id === edit.dataset.edit));
     } else if (remove) {
-      if (!removeCustomRate(app.state, remove.dataset.delete)) return;
+      if (!removeSource(app.state, remove.dataset.delete)) return;
       app.save();
       onChange();
-      renderBar();
       renderList();
-      app.toast(app.t('rateDeleted'));
-      $('[data-id=""]', el.list).focus();
+      app.toast(app.t('srcDeleted'));
+      $('[data-id="market"]', el.list).focus();
     } else if (choose) {
-      if (!selectCustomRate(app.state, choose.dataset.id)) return;
+      if (!selectSource(app.state, choose.dataset.id)) return;
       app.save();
       onChange();
-      renderBar();
       sheet.close();
     }
   });
-  // A radio group: arrows move between the rates
+  // A radio group: arrows move between the sources
   el.list.addEventListener('keydown', event => {
     const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
     if (!step || !event.target.matches('[data-id]')) return;
@@ -210,31 +243,47 @@ export function createRatesView(app, { onChange }) {
     event.preventDefault();
     submitForm();
   });
-  for (const select of [el.from, el.to]) {
-    select.addEventListener('change', () => {
-      showError('');
-      renderMarketHint();
-    });
-  }
-  el.value.addEventListener('input', () => {
-    const clean = sanitizeExpression(el.value.value);
-    if (clean !== el.value.value) el.value.value = clean;
-    if (rateValue(clean) != null) showError('');
-  });
-  el.useMarket.addEventListener('click', () => {
-    const market = marketRate();
-    if (market == null) return;
-    el.value.value = formatAmount(market, el.to.value, { plain: true });
+  el.quote.addEventListener('change', () => {
     showError('');
-    el.value.focus();
+    refreshRows();
+  });
+  el.addRow.addEventListener('click', () => {
+    $('.src-row__rate', addRow()).focus();
+  });
+  el.rows.addEventListener('click', event => {
+    const remove = event.target.closest('[data-remove]');
+    if (!remove) return;
+    remove.closest('[data-row]').remove();
+    if (!rowEls().length) addRow();
+    showError('');
+    refreshRows();
+  });
+  el.rows.addEventListener('change', event => {
+    if (event.target.matches('.src-row__code')) {
+      showError('');
+      refreshRows();
+    }
+  });
+  el.rows.addEventListener('input', event => {
+    if (!event.target.matches('.src-row__rate')) return;
+    const clean = sanitizeExpression(event.target.value);
+    if (clean !== event.target.value) event.target.value = clean;
+    event.target.closest('[data-row]').classList.remove('is-error');
+  });
+  // Empty fields take today's market rate, to be corrected by hand
+  el.fill.addEventListener('click', () => {
+    for (const row of rowEls()) {
+      const input = $('.src-row__rate', row);
+      const market = app.marketConvert(1, $('.src-row__code', row).value, quote());
+      if (!input.value.trim() && market != null) input.value = formatAmount(market, quote(), { plain: true });
+    }
+    showError('');
   });
 
-  /** Called when rates arrive or the language changes. */
+  /** Called when rates arrive, the language changes or the source changes. */
   function render() {
     renderBar();
-    if (!sheet.isOpen()) return;
-    if (el.form.hidden) renderList();
-    else renderMarketHint();
+    if (sheet.isOpen() && el.form.hidden) renderList();
   }
 
   return { render };

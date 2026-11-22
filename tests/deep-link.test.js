@@ -62,7 +62,7 @@ test('converter: broken values are ignored one by one', () => {
 test('a purchase link opens the tab with every field of the form', () => {
   const { applied, state } = open(
     '?mode=purchase&price=450&cur=CNY&card=UZS&fee=3&free=0&min=0&bank=1.5&buffer=2' +
-    '&delivery=road&weight=1250&unit=g&air=11&road=7&step=0.5&paycard=1' +
+    '&delivery=road&weight=1250&unit=g&air=11&road=7&step=0.5&paycard=1' + // paycard is no longer used
     '&big=1&len=60&wid=50&hei=40&vdiv=5000&vfree=0'
   );
   assert.equal(applied, true);
@@ -71,7 +71,7 @@ test('a purchase link opens the tab with every field of the form', () => {
     price: '450', priceCur: 'CNY', card: 'UZS',
     svcPct: '3', freeBelow: '0', svcMin: '0', bankPct: '1.5', bufPct: '2',
     dlOn: true, dlMethod: 'auto', dlWeight: '1250', dlUnit: 'g',
-    dlAir: '11', dlAuto: '7', dlStep: '0.5', dlPayCard: true,
+    dlAir: '11', dlAuto: '7', dlStep: '0.5',
     dlBig: true, dlLen: '60', dlWid: '50', dlHei: '40', dlDiv: '5000', dlVolFree: '0'
   });
 });
@@ -79,7 +79,7 @@ test('a purchase link opens the tab with every field of the form', () => {
 test('purchase links survive a round trip, with and without delivery', () => {
   for (const shop of [
     { price: '89,9*2', priceCur: 'USD', card: 'USD', bankPct: '1,5' },
-    { price: '1 299', dlOn: true, dlMethod: 'air', dlWeight: '0.3+0.45', dlPayCard: true },
+    { price: '1 299', dlOn: true, dlMethod: 'air', dlWeight: '0.3+0.45' },
     { price: '', dlOn: true, dlMethod: 'auto', dlWeight: '2', dlUnit: 'kg', dlStep: '0' }
   ]) {
     const sender = fresh();
@@ -92,9 +92,9 @@ test('purchase links survive a round trip, with and without delivery', () => {
 
 test('purchase: delivery=off clears delivery like the switch does', () => {
   const state = fresh();
-  Object.assign(state.shop, { dlOn: true, dlWeight: '3', dlPayCard: true });
-  applyDeepLink(state, '?mode=purchase&price=10&delivery=off&weight=9&paycard=1');
-  assert.deepEqual([state.shop.dlOn, state.shop.dlWeight, state.shop.dlPayCard], [false, '', false]);
+  Object.assign(state.shop, { dlOn: true, dlWeight: '3' });
+  applyDeepLink(state, '?mode=purchase&price=10&delivery=off&weight=9');
+  assert.deepEqual([state.shop.dlOn, state.shop.dlWeight], [false, '']);
   assert.equal(buildQuery(state).includes('weight='), false, 'a link without delivery does not carry its fields');
 });
 

@@ -1,11 +1,14 @@
-// Entry point: builds the state, creates the views and keeps rates fresh.
+// Entry point: builds the state, creates the views and keeps every rate source
+// fresh — the market rates and both banks, on start and on every refresh.
 import { APP_VERSION, STORAGE_KEYS, TIMING } from './config.js';
-import { activeCustomRate, withCustomRate } from './core/custom-rates.js';
+import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
+import { resolveSource, sourceSummary, sourceTable } from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState, restoreDroppedSum } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
+import { loadBankBoard } from './services/bank-rates-api.js';
 import { loadLatestRates } from './services/rates-api.js';
 import { adoptEarlierStorage, clearSessionFlag, readJson, takeSessionFlag, writeJson } from './services/storage.js';
 import { registerServiceWorker } from './services/sw-update.js';
@@ -20,6 +23,8 @@ import { createPurchaseView } from './ui/purchase.js';
 import { createRatesView } from './ui/rates.js';
 import { createShell } from './ui/shell.js';
 
+const BANKS = ['cbu', 'nbu'];
+
 try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
 
 const saved = readJson(STORAGE_KEYS.state);
@@ -31,36 +36,47 @@ const state = buildState(saved, {
 applyDeepLink(state, location.search, isKnownCurrency);
 restoreDroppedSum(state, Number.isInteger(saved?.v) ? saved.v : null);
 let snapshot = restoreSnapshot(readJson(STORAGE_KEYS.rates));
+let banks = restoreBankCache(readJson(STORAGE_KEYS.banks));
+const bankStatus = { cbu: 'idle', nbu: 'idle' }; // 'loading' | 'ok' | 'failed'
 
-// The table calculations run on: the market rates, with one pair replaced
-// while one of the user's own rates is switched on. Rebuilt only when the
-// market snapshot or that rate changes.
-let tableInUse = { market: null, key: '', table: null };
+// The table calculations run on: the market rates with the chosen source's
+// rates put in. Rebuilt only when the market rates or that source change.
+let tableInUse = { key: '', table: null };
 function ratesInUse() {
   if (!snapshot) return null;
-  const custom = activeCustomRate(state);
-  const key = custom ? `${custom.from}|${custom.to}|${custom.rate}` : '';
-  if (tableInUse.market !== snapshot.rates || tableInUse.key !== key) {
-    tableInUse = { market: snapshot.rates, key, table: withCustomRate(snapshot.rates, custom) };
-  }
+  const { kind, source } = resolveSource(state, banks);
+  const key = `${snapshot.ts}|${state.rateSource}|${kind === 'bank' ? source?.ts : JSON.stringify(source)}`;
+  if (tableInUse.key !== key) tableInUse = { key, table: sourceTable(snapshot.rates, source) };
   return tableInUse.table;
 }
 
 const syncUrl = createUrlSync(state);
 const toast = createToast($('#toast'), TIMING.toastMs);
+const t = (key, vars) => translate(state.lang, key, vars);
 
 // What every view gets: the state plus a few services. Views never touch
 // storage, the network or the address bar themselves.
 const app = {
   state,
   get rates() { return snapshot; },
-  t: (key, vars) => translate(state.lang, key, vars),
+  /** The bank boards as loaded: {cbu, nbu}, each null until it arrives. */
+  get banks() { return banks; },
+  get bankStatus() { return bankStatus; },
+  t,
   locale: () => localeOf(state.lang),
-  /** With the rate the user switched on; null while there are no rates. */
+  /** With the chosen rate source; null while there are no rates. */
   convert: (value, from, to) => convert(ratesInUse(), value, from, to),
-  /** Always by the market rates, to compare the user's own rate with. */
+  /** Always by the market rates, to compare a source of one's own with. */
   marketConvert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
-  customRate: () => activeCustomRate(state),
+  /** The source in use: {id, kind, source, missing}. */
+  rateSource: () => resolveSource(state, banks),
+  /** One line for a shared calculation, when its numbers are not the market ones. */
+  rateNote: () => {
+    const { kind, id, source, missing } = resolveSource(state, banks);
+    if (kind === 'market' || missing) return null;
+    if (kind === 'bank') return t('shareSourceBank', { name: t(id === 'cbu' ? 'bankCbu' : 'bankNbuSell'), date: source.date });
+    return t('shareSourceOwn', { name: source.name, rates: sourceSummary(source, localeOf(state.lang), 3) });
+  },
   save: () => {
     writeJson(STORAGE_KEYS.state, state);
     syncUrl();
@@ -71,8 +87,8 @@ const app = {
   /** Opens the system share sheet, or copies the text where there is none. */
   share: async text => {
     const outcome = await shareText(text);
-    if (outcome === 'copied') toast(translate(state.lang, 'shareCopied'));
-    else if (outcome === 'failed') toast(translate(state.lang, 'copyFailed'));
+    if (outcome === 'copied') toast(t('shareCopied'));
+    else if (outcome === 'failed') toast(t('copyFailed'));
   }
 };
 
@@ -85,25 +101,48 @@ const shell = createShell(app, {
   onViewChange: view => {
     if (view === 'convert') converter.render();
     else if (view === 'shop') purchase.takeAmount(); // the amount typed on the main screen becomes the price
-    else banks.refresh();
   }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
 const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
 const purchase = createPurchaseView(app, { keypad });
-const customRates = createRatesView(app, { onChange: renderAll });
-const banks = createBanksView(app, { onRateChange: renderAll });
+const rateSources = createRatesView(app, { onChange: renderAll });
+const bankView = createBanksView(app, { onSourceChange: renderAll });
 
 function renderAll() {
   converter.render();
   purchase.render();
-  customRates.render();
-  banks.render();
+  rateSources.render();
+  bankView.render();
+}
+
+/**
+ * Loads one bank's board. Each bank is shown as soon as it answers; one that
+ * is slow or unreachable (the National Bank answers only inside Uzbekistan)
+ * never holds the others back. A bank that does not answer keeps its last board.
+ */
+async function refreshBank(bank, force) {
+  const board = banks[bank];
+  if (bankStatus[bank] === 'loading' || (!force && board && Date.now() - board.ts < TIMING.ratesStaleMs)) return;
+  bankStatus[bank] = 'loading';
+  renderAll();
+  const fresh = await loadBankBoard(bank);
+  bankStatus[bank] = fresh ? 'ok' : 'failed';
+  if (fresh) {
+    banks = { ...banks, [bank]: fresh };
+    writeJson(STORAGE_KEYS.banks, banks);
+  }
+  renderAll();
 }
 
 let refreshing = false;
-async function refreshRates({ manual = false } = {}) {
-  if (manual && state.view === 'banks') banks.refresh({ force: true });
+/**
+ * Every source at once: the market rates and both banks.
+ * @param {{manual?: boolean, all?: boolean}} [options]  manual: the refresh
+ *   button (reports the outcome); all: reload the banks even if just loaded
+ */
+async function refreshRates({ manual = false, all = manual } = {}) {
+  const bankLoads = Promise.all(BANKS.map(bank => refreshBank(bank, all)));
   if (refreshing) return;
   refreshing = true;
   shell.setRefreshing(true);
@@ -128,7 +167,11 @@ async function refreshRates({ manual = false } = {}) {
   // An open currency list is rebuilt only when rates arrive for the first time
   // (it then learns every currency); later refreshes would drop focus and scroll.
   if (firstLoad && snapshot) picker.render();
-  if (manual) app.toast(app.t(fresh ? 'ratesRefreshed' : 'ratesFailed'));
+  if (manual) {
+    await bankLoads;
+    const banksOk = BANKS.filter(bank => bankStatus[bank] === 'ok').length;
+    app.toast(t(fresh ? 'ratesRefreshedAll' : 'ratesFailed', { n: banksOk, total: BANKS.length }));
+  }
 }
 
 // ---------- boot ----------
@@ -138,10 +181,9 @@ shell.setView(state.view);
 shell.applyTexts();
 shell.setStatus(snapshot ? (navigator.onLine ? 'ok' : 'offline') : 'loading');
 renderAll();
-if (state.view === 'banks') banks.refresh();
 
 if (takeSessionFlag(STORAGE_KEYS.updatedFlag)) {
-  setTimeout(() => app.toast(app.t('updatedTo', { v: APP_VERSION })), TIMING.splashMaxCachedMs);
+  setTimeout(() => app.toast(t('updatedTo', { v: APP_VERSION })), TIMING.splashMaxCachedMs);
 }
 
 // The splash stays for a moment even when rates arrive instantly, and never
@@ -159,7 +201,8 @@ function dismissSplash() {
   }, wait);
 }
 const splashLimit = setTimeout(dismissSplash, snapshot ? TIMING.splashMaxCachedMs : TIMING.splashMaxMs);
-refreshRates().finally(() => {
+// Every source is loaded fresh on start, whatever was cached
+refreshRates({ all: true }).finally(() => {
   clearTimeout(splashLimit);
   dismissSplash();
 });

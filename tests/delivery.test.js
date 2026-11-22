@@ -69,9 +69,10 @@ test('the threshold and divisor are adjustable', () => {
 
 test('an oversized parcel in the whole purchase', () => {
   const cv = (value, from, to) => convert({ USD: 1, CNY: 7, UZS: 12000 }, value, from, to);
-  const r = calcPurchase(box({ price: '700', dlWeight: '16', svcPct: '0', bufPct: '0', dlPayCard: true }), cv);
-  close(r.deliveryPart, 198, '20 kg × 9.9');
-  assert.equal(r.topup, 100 + 198);
+  const r = calcPurchase(box({ price: '700', dlWeight: '16', svcPct: '0', bufPct: '0' }), cv);
+  close(r.delivery.cost, 198, '20 kg × 9.9');
+  assert.equal(r.topup, 100, 'the card is topped up for the goods');
+  close(r.summary.needUsd, 100 + 198, 'and delivery is added to the total needed');
 });
 
 test('older settings: the air rate moves to 9.9 unless it was typed by hand', () => {
