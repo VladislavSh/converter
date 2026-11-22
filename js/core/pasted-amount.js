@@ -1,6 +1,7 @@
 // Reads an amount out of text copied from a shop page or a chat:
 // "¥1,299.00", "45,5 ¥", "12 990 сум", "US $5.99", "券后 ¥23.8 起".
 // Pure functions — the clipboard itself is handled in the UI.
+import { evaluate } from './expression.js';
 import { plainNumber } from './format.js';
 import { isCurrencyCode } from './rates.js';
 import { PRICE_CURRENCIES } from './state.js';
@@ -137,4 +138,27 @@ export function pastedPrice(pasted, shop, convert) {
     }
   }
   return { price: plainNumber(value), currency: shop.priceCur, convertedFrom: null };
+}
+
+/**
+ * "Purchase" was opened: the amount typed on the main screen becomes the item
+ * price. Once per edit — after that the price is the user's own again, and
+ * going back and forth between the tabs does not overwrite it.
+ * @returns {{value: number, price: string, currency: string, convertedFrom: string|null}|null}
+ *   null when there is nothing new to take
+ */
+export function takeConverterAmount(state, convert) {
+  if (!state.amountFresh) return null;
+  const value = evaluate(state.input);
+  if (!(value > 0)) {
+    state.amountFresh = false;
+    return null;
+  }
+  const result = pastedPrice({ value, currency: state.base }, state.shop, convert);
+  // No rate yet for a currency the price field does not take: wait for the
+  // rates rather than turn "8000 RUB" into "8000 CNY".
+  if (result.currency !== state.base && !result.convertedFrom) return null;
+  state.amountFresh = false;
+  Object.assign(state.shop, { price: result.price, priceCur: result.currency });
+  return { value, ...result };
 }

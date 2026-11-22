@@ -10,7 +10,11 @@ import { SHOP_DEFAULTS } from '../js/core/state.js';
 const TABLE = { USD: 1, CNY: 7, UZS: 12000 };
 const cv = (value, from, to) => convert(TABLE, value, from, to);
 const noRates = () => null;
-const shop = overrides => ({ ...SHOP_DEFAULTS, ...overrides });
+// Most scenarios below use the WeChat Pay / Alipay rule (free up to 200 ¥).
+// The rule the app ships with — a card linked in Pinduoduo — has tests of its own.
+const WECHAT = { svcPct: '3', freeBelow: '200', svcMin: '0' };
+const shop = overrides => ({ ...SHOP_DEFAULTS, ...WECHAT, ...overrides });
+const shipped = overrides => ({ ...SHOP_DEFAULTS, ...overrides });
 const close = (actual, expected, message) =>
   assert.ok(Math.abs(actual - expected) < 1e-6, `${message ?? ''} ${actual} ≉ ${expected}`);
 
@@ -41,9 +45,8 @@ test('payment fee: other rules', () => {
   assert.equal(paymentFee(100, { percent: 3, freeBelow: 0, minimum: 2 }), 3, 'minimum does not cap');
 });
 
-// The rule the app ships with (WeChat Pay / Alipay with a foreign card):
-// a payment of up to 200 ¥ INCLUSIVE costs nothing extra — there is no fixed
-// "+2 ¥" — and above 200 ¥ the fee is 3% of the whole payment.
+// WeChat Pay / Alipay with a foreign card: a payment of up to 200 ¥ INCLUSIVE
+// costs nothing extra, and above 200 ¥ the fee is 3% of the whole payment.
 test('fee around the 200 ¥ threshold, to the fen', () => {
   const cases = [
     // price,  fee,     order total, shown fee, shown total
@@ -79,14 +82,45 @@ test('the threshold is compared with the calculated price, not with its text', (
   close(fee('67*3'), 6.03, '201');
 });
 
-test('a card linked directly in Pinduoduo: 3% of any amount', () => {
-  const direct = { freeBelow: '0', svcMin: '0' };
-  close(calcPurchase(shop({ price: '100', ...direct }), cv).fee.feeCny, 3);
-  close(calcPurchase(shop({ price: '199', ...direct }), cv).fee.feeCny, 5.97);
-  close(calcPurchase(shop({ price: '200', ...direct }), cv).fee.feeCny, 6);
-  close(calcPurchase(shop({ price: '201', ...direct }), cv).fee.feeCny, 6.03);
-  // where "about 2 yuan on a small order" comes from: 3% of 67 ¥
-  close(calcPurchase(shop({ price: '67', ...direct }), cv).fee.feeCny, 2.01);
+// The rule the app ships with — a card linked in Pinduoduo itself: 3% of any
+// amount, but not less than 2 ¥. 3% reaches 2 ¥ at 66,67 ¥, so cheaper orders
+// pay the flat 2 ¥ and there is no free threshold at all.
+test('the shipped rule: 3% of any amount, at least 2 ¥', () => {
+  assert.deepEqual(
+    [SHOP_DEFAULTS.svcPct, SHOP_DEFAULTS.freeBelow, SHOP_DEFAULTS.svcMin], ['3', '0', '2']
+  );
+  const cases = [
+    // price,  fee,     order total, the minimum?, shown fee
+    ['1',      2,       3,           true,         '2,00'],
+    ['30',     2,       32,          true,         '2,00'],
+    ['66',     2,       68,          true,         '2,00'],
+    ['66.66',  2,       68.66,       true,         '2,00'],
+    ['66.67',  2.0001,  68.6701,     false,        '2,00'],
+    ['67',     2.01,    69.01,       false,        '2,01'],
+    ['100',    3,       103,         false,        '3,00'],
+    ['199',    5.97,    204.97,      false,        '5,97'],
+    ['200',    6,       206,         false,        '6,00'],
+    ['201',    6.03,    207.03,      false,        '6,03'],
+    ['1000',   30,      1030,        false,        '30,00']
+  ];
+  for (const [price, fee, total, isMinimum, shownFee] of cases) {
+    const r = calcPurchase(shipped({ price, bufPct: '0' }), cv);
+    close(r.fee.feeCny, fee, `fee for ${price} ¥`);
+    close(r.orderTotal, total, `total for ${price} ¥`);
+    assert.equal(r.fee.isMinimum, isMinimum, `${price} ¥: is it the minimum`);
+    assert.equal(formatMoney(r.feeInCurrency, 'CNY').replace(/\u00A0/g, ' '), shownFee);
+    assert.equal(r.split, null, 'no free threshold, so nothing to gain by splitting the order');
+  }
+  assert.equal(calcPurchase(shipped({ price: '' }), cv).fee.feeCny, 0, 'no price: no fee');
+});
+
+test('the minimum is in yuan whatever currency the price is in', () => {
+  // 5 USD = 35 ¥ → 3% is 1,05 ¥, so the 2 ¥ minimum applies: 2 ¥ = 0,2857 USD
+  const r = calcPurchase(shipped({ price: '5', priceCur: 'USD', bufPct: '0' }), cv);
+  assert.equal(r.fee.feeCny, 2);
+  assert.equal(r.fee.isMinimum, true);
+  close(r.feeInCurrency, 2 / 7);
+  close(r.orderTotal, 5 + 2 / 7);
 });
 
 test('weight is rounded up to the step', () => {

@@ -30,7 +30,7 @@ test('theme and language follow the device until the user chooses', () => {
 test('a current state is restored as it was saved', () => {
   const saved = {
     v: STATE_VERSION, theme: 'light', lang: 'en', view: 'shop',
-    list: ['UZS', 'USD', 'KZT'], base: 'KZT', input: '120*3',
+    list: ['UZS', 'USD', 'KZT'], base: 'KZT', input: '120*3', amountFresh: true,
     shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34', dlPayCard: true }
   };
   assert.deepEqual(buildState(structuredClone(saved)), saved);
@@ -54,18 +54,41 @@ test('upgrade to v7 keeps currencies the user added themselves', () => {
   assert.equal(state.base, 'KZT');
 });
 
+const rule = state => [state.shop.svcPct, state.shop.freeBelow, state.shop.svcMin];
+
 test('older fee settings are migrated', () => {
   const v2 = buildState({ v: 2, shop: { svcPct: '5', svcFix: '10', ship: '8', dlOn: true } });
-  assert.deepEqual([v2.shop.svcPct, v2.shop.freeBelow, v2.shop.svcMin], ['3', '200', '0']);
+  assert.deepEqual(rule(v2), ['3', '0', '2']);
   assert.equal(v2.shop.dlOn, false, 'delivery starts switched off');
   assert.equal('svcFix' in v2.shop, false, 'retired fields are gone');
   assert.equal('ship' in v2.shop, false);
 
-  const v5 = buildState({ v: 5, shop: { svcPct: '3', freeBelow: '0', svcMin: '2' } });
-  assert.deepEqual([v5.shop.freeBelow, v5.shop.svcMin], ['200', '0'], 'the wrong "min 2 ¥" preset is replaced');
-
   const custom = buildState({ v: 5, shop: { svcPct: '4', freeBelow: '100', svcMin: '1' } });
-  assert.deepEqual([custom.shop.svcPct, custom.shop.freeBelow, custom.shop.svcMin], ['4', '100', '1'], 'own settings survive');
+  assert.deepEqual(rule(custom), ['4', '100', '1'], 'own settings survive');
+});
+
+test('upgrade to v8: the fee rule becomes "3%, at least 2 ¥" unless the user set their own', () => {
+  const wechat = buildState({ v: 7, shop: { svcPct: '3', freeBelow: '200', svcMin: '0' } });
+  assert.deepEqual(rule(wechat), ['3', '0', '2'], 'the earlier default');
+  const always = buildState({ v: 7, shop: { svcPct: '3,0', freeBelow: '', svcMin: '0' } });
+  assert.deepEqual(rule(always), ['3', '0', '2'], 'the earlier "3% always" preset, however it was typed');
+
+  const own = buildState({ v: 7, shop: { svcPct: '2.5', freeBelow: '200', svcMin: '0' } });
+  assert.deepEqual(rule(own), ['2.5', '200', '0'], 'a rule typed by hand is kept');
+  const none = buildState({ v: 7, shop: { svcPct: '0', freeBelow: '0', svcMin: '0' } });
+  assert.deepEqual(rule(none), ['0', '0', '0'], '"no fee" is kept');
+
+  // Choosing the WeChat rule again after the upgrade sticks
+  const chosen = buildState({ v: 8, shop: { svcPct: '3', freeBelow: '200', svcMin: '0' } });
+  assert.deepEqual(rule(chosen), ['3', '200', '0']);
+});
+
+test('the "amount was just typed" mark survives a reload and nothing else sets it', () => {
+  assert.equal(buildState(null).amountFresh, false);
+  assert.equal(buildState({ v: 8, amountFresh: true }).amountFresh, true);
+  assert.equal(buildState({ v: 8, amountFresh: 'yes' }).amountFresh, false);
+  const gone = buildState({ v: 8, list: ['USD', 'CNY'], base: 'EUR', input: '50', amountFresh: true });
+  assert.equal(gone.amountFresh, false, 'the amount was reset, so there is nothing to carry over');
 });
 
 test('corrupted or hostile storage never reaches the app', () => {

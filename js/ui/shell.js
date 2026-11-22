@@ -1,10 +1,12 @@
 // App chrome: theme, language, rates status line, the two view tabs, splash
-// screen, footer and the "Install" button.
+// screen, footer and installing the app to the home screen.
 import { APP_NAME, APP_VERSION, RATE_SOURCES } from '../config.js';
+import { INSTALL_STEPS, installPlatform, isInstalled } from '../core/install.js';
 import { $, $$ } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
 const SPLASH_FADE_MS = 700;
+const FOCUS_DELAY_MS = 250; // after the sheet's opening transition
 
 export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) {
   const el = {
@@ -18,7 +20,10 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     refresh: $('#refresh-btn'),
     tabs: $$('.view-tab'),
     views: { convert: $('#view-convert'), shop: $('#view-shop') },
-    install: $('#install-btn'),
+    app: $('#app'),
+    installButtons: $$('[data-install]'),
+    installSheet: $('#install-sheet'),
+    installSteps: $('#install-steps'),
     source: $('#source-text'),
     version: $('#version-text')
   };
@@ -43,6 +48,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
       list: [RATE_SOURCES.fiatPrimary.name, RATE_SOURCES.fiatFallback.name, RATE_SOURCES.crypto.name].join(', ')
     });
     el.version.textContent = t('version', { v: APP_VERSION });
+    renderInstallSteps();
     setStatus();
   }
 
@@ -112,21 +118,73 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     onViewChange(app.state.view);
   }));
 
-  // "Install" appears only when the browser offers installation
+  // ---------- installing to the home screen ----------
+  // "Install" is always there in a browser tab. Where the browser offers
+  // installation (Chrome, Edge) the button opens its dialog; elsewhere (Safari
+  // on iPhone, Firefox) it shows where the menu item is.
+  const platform = installPlatform(navigator);
   let installPrompt = null;
+  let guideOpener = null;
+
+  function renderInstallSteps() {
+    el.installSteps.replaceChildren(...INSTALL_STEPS[platform].map(key => {
+      const step = document.createElement('li');
+      step.textContent = app.t(key);
+      return step;
+    }));
+  }
+
+  const guideIsOpen = () => el.installSheet.classList.contains('is-open');
+
+  function openInstallGuide() {
+    guideOpener = document.activeElement;
+    el.installSheet.classList.add('is-open');
+    el.installSheet.setAttribute('aria-hidden', 'false');
+    el.app.inert = true; // keep focus and screen readers inside the dialog
+    setTimeout(() => {
+      if (guideIsOpen()) $('[data-close].icon-btn', el.installSheet).focus({ preventScroll: true });
+    }, FOCUS_DELAY_MS);
+  }
+
+  function closeInstallGuide() {
+    if (!guideIsOpen()) return;
+    el.installSheet.classList.remove('is-open');
+    el.installSheet.setAttribute('aria-hidden', 'true');
+    el.app.inert = false;
+    guideOpener?.focus?.({ preventScroll: true });
+    guideOpener = null;
+  }
+
+  const showInstall = visible => el.installButtons.forEach(button => { button.hidden = !visible; });
+  showInstall(!isInstalled({
+    standaloneDisplay: matchMedia('(display-mode: standalone)').matches,
+    iosStandalone: navigator.standalone
+  }));
+
   window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
+    event.preventDefault(); // no browser banner: the button asks when the user wants it
     installPrompt = event;
-    el.install.hidden = false;
   });
-  window.addEventListener('appinstalled', () => { el.install.hidden = true; });
-  el.install.addEventListener('click', async () => {
-    if (!installPrompt) return;
-    const prompt = installPrompt;
+  window.addEventListener('appinstalled', () => {
     installPrompt = null;
-    el.install.hidden = true;
+    showInstall(false);
+    closeInstallGuide();
+  });
+  el.installButtons.forEach(button => button.addEventListener('click', async () => {
+    if (!installPrompt) {
+      openInstallGuide();
+      return;
+    }
+    const prompt = installPrompt;
+    installPrompt = null; // a prompt can be shown only once
     prompt.prompt();
     await prompt.userChoice.catch(() => {});
+  }));
+  el.installSheet.addEventListener('click', event => {
+    if (event.target.closest('[data-close]')) closeInstallGuide();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeInstallGuide();
   });
 
   return { applyTheme, applyTexts, setStatus, setView, setRefreshing, hideSplash };

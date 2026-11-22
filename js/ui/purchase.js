@@ -2,7 +2,7 @@
 // All numbers come from core/purchase.js; this file only formats and binds.
 import { isExpression, sanitizeExpression } from '../core/expression.js';
 import { formatMoney, formatNumber, plainNumber } from '../core/format.js';
-import { parsePastedAmount, pastedPrice } from '../core/pasted-amount.js';
+import { parsePastedAmount, pastedPrice, takeConverterAmount } from '../core/pasted-amount.js';
 import { calcPurchase, parseNumber } from '../core/purchase.js';
 import { breakdownLines, purchaseShareText } from '../core/share-text.js';
 import { $, $$, copyText, escapeHtml, readClipboardText } from './dom.js';
@@ -247,18 +247,29 @@ export function createPurchaseView(app) {
   // --- pasting a price copied from the shop: "¥1,299.00", "$12.99", "1 500 ₽" ---
   const hasRate = code => app.convert(1, 'USD', code) != null;
 
-  /** Puts a pasted price into the form and says what was understood. */
-  function replacePrice(pasted) {
-    const result = pastedPrice(pasted, shop(), app.convert);
-    Object.assign(shop(), { price: result.price, priceCur: result.currency });
+  /** Shows a price that was put into the form and says where it came from. */
+  function showNewPrice(result, sourceValue, plainKey, convertedKey) {
     el.price.value = result.price;
     el.currency.value = result.currency;
     changed();
     const money = (value, code) => `${formatMoney(value, code, app.locale())} ${code}`;
     const price = money(Number(result.price), result.currency);
     app.toast(result.convertedFrom
-      ? app.t('pastedConverted', { from: money(pasted.value, result.convertedFrom), to: price })
-      : app.t('pasted', { text: price }));
+      ? app.t(convertedKey, { from: money(sourceValue, result.convertedFrom), to: price })
+      : app.t(plainKey, { text: price }));
+  }
+
+  /** Puts a pasted price into the form and says what was understood. */
+  function replacePrice(pasted) {
+    const result = pastedPrice(pasted, shop(), app.convert);
+    Object.assign(shop(), { price: result.price, priceCur: result.currency });
+    showNewPrice(result, pasted.value, 'pasted', 'pastedConverted');
+  }
+
+  /** The tab was opened: an amount just typed on the main screen becomes the price. */
+  function takeAmount() {
+    const taken = takeConverterAmount(app.state, app.convert);
+    if (taken) showNewPrice(taken, taken.value, 'carried', 'carriedConverted');
   }
 
   el.paste.addEventListener('click', async () => {
@@ -330,5 +341,5 @@ export function createPurchaseView(app) {
   });
   el.dlPayCard.addEventListener('change', () => { shop().dlPayCard = el.dlPayCard.checked; changed(); });
 
-  return { render };
+  return { render, takeAmount };
 }

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyPastedAmount, parseNumberToken, parsePastedAmount, pastedPrice } from '../js/core/pasted-amount.js';
+import {
+  applyPastedAmount, parseNumberToken, parsePastedAmount, pastedPrice, takeConverterAmount
+} from '../js/core/pasted-amount.js';
 import { plainNumber } from '../js/core/format.js';
 import { convert } from '../js/core/rates.js';
 import { SHOP_DEFAULTS } from '../js/core/state.js';
@@ -128,4 +130,68 @@ test('purchase: another currency is converted into the price currency', () => {
     { price: '1600', currency: 'CNY', convertedFrom: null },
     'without rates the number is pasted as it is'
   );
+});
+
+// ---------- the amount typed on the main screen goes into "Purchase" ----------
+
+const typed = (base, input, shop = {}) => ({ base, input, amountFresh: true, shop: { ...SHOP_DEFAULTS, ...shop } });
+
+test('the typed amount becomes the item price in its own currency', () => {
+  const yuan = typed('CNY', '450', { price: '12', priceCur: 'USD' });
+  assert.deepEqual(takeConverterAmount(yuan, cv), { value: 450, price: '450', currency: 'CNY', convertedFrom: null });
+  assert.deepEqual([yuan.shop.price, yuan.shop.priceCur], ['450', 'CNY']);
+  assert.equal(yuan.amountFresh, false);
+
+  const dollars = typed('USD', '12,99');
+  takeConverterAmount(dollars, cv);
+  assert.deepEqual([dollars.shop.price, dollars.shop.priceCur], ['12.99', 'USD']);
+
+  const sum = typed('UZS', '1 500 000');
+  takeConverterAmount(sum, cv);
+  assert.deepEqual([sum.shop.price, sum.shop.priceCur], ['1500000', 'UZS']);
+});
+
+test('a calculation is carried over as its result', () => {
+  const state = typed('CNY', '89.9*2+15');
+  takeConverterAmount(state, cv);
+  assert.equal(state.shop.price, '194.8');
+});
+
+test('a currency the price field does not take is converted into the current one', () => {
+  const state = typed('RUB', '1600');
+  assert.deepEqual(takeConverterAmount(state, cv), { value: 1600, price: '140', currency: 'CNY', convertedFrom: 'RUB' });
+  assert.deepEqual([state.shop.price, state.shop.priceCur], ['140', 'CNY']);
+
+  const waiting = typed('RUB', '1600', { price: '30' });
+  assert.equal(takeConverterAmount(waiting, () => null), null, 'no rates yet');
+  assert.equal(waiting.shop.price, '30', '"1600 RUB" must not turn into "1600 CNY"');
+  assert.equal(waiting.amountFresh, true, 'it is taken once the rates are there');
+  takeConverterAmount(waiting, cv);
+  assert.equal(waiting.shop.price, '140');
+});
+
+test('the price is taken once: going between the tabs does not overwrite it again', () => {
+  const state = typed('CNY', '450');
+  takeConverterAmount(state, cv);
+  state.shop.price = '500'; // corrected by hand in "Purchase"
+  assert.equal(takeConverterAmount(state, cv), null);
+  assert.equal(state.shop.price, '500');
+
+  state.input = '700'; // typed again on the main screen
+  state.amountFresh = true;
+  takeConverterAmount(state, cv);
+  assert.equal(state.shop.price, '700');
+});
+
+test('nothing is carried over without a new, positive amount', () => {
+  const untouched = { ...typed('USD', '100', { price: '30' }), amountFresh: false };
+  assert.equal(takeConverterAmount(untouched, cv), null, 'the amount the app started with is not a price');
+  assert.equal(untouched.shop.price, '30');
+
+  for (const input of ['', '0', '5+(', '-20']) {
+    const state = typed('CNY', input, { price: '30' });
+    assert.equal(takeConverterAmount(state, cv), null, JSON.stringify(input));
+    assert.equal(state.shop.price, '30');
+    assert.equal(state.amountFresh, false);
+  }
 });

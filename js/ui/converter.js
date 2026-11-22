@@ -134,6 +134,7 @@ export function createConverterView(app, { onEditList }) {
     const clean = sanitizeExpression(el.input.value);
     if (clean !== el.input.value) el.input.value = clean;
     app.state.input = clean;
+    app.state.amountFresh = true; // "Purchase" takes it as the item price when opened
     app.save();
     updateValues();
   }
@@ -185,6 +186,7 @@ export function createConverterView(app, { onEditList }) {
   /** The pasted amount replaces the current one; a recognised currency becomes the source. */
   function replaceWithPasted(pasted) {
     applyPastedAmount(app.state, pasted, hasRate);
+    app.state.amountFresh = true;
     app.save();
     if (document.activeElement === el.input) el.input.value = app.state.input;
     render();

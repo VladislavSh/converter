@@ -260,6 +260,11 @@ h1, h2, p { margin: 0; }
 .ghost-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 @media (max-width: 350px) {
+  /* three buttons next to the name: tighter, so the row still fits */
+  .brand { gap: 8px; }
+  .brand__icon { width: 36px; height: 36px; }
+  .topbar__actions { gap: 6px; }
+  .topbar .icon-btn { width: 38px; height: 38px; border-radius: 13px; }
   .hero__input { font-size: 52px; }
   .hero__input[data-size="l"] { font-size: 42px; }
   .hero__input[data-size="m"] { font-size: 31px; }
@@ -444,6 +449,17 @@ h1, h2, p { margin: 0; }
   .sheet.is-open .sheet__panel { transform: translate(-50%, 50%) scale(1); opacity: 1; }
   .sheet__grab { visibility: hidden; }
 }
+/* A short sheet: as tall as its text */
+.sheet__panel--fit { height: auto; max-height: 86dvh; overflow-y: auto; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+.guide__lead { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.guide__steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; }
+.guide__steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; font-size: 15px; line-height: 1.45; font-weight: 500; }
+.guide__steps li::before {
+  content: counter(step); width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-size: 13px; font-weight: 800;
+}
+.guide__ok { margin-top: 18px; width: 100%; height: 48px; border-radius: 16px; background: var(--input-bg); font-size: 15px; font-weight: 700; }
+.guide__ok:hover { background: var(--card-hover); }
 .sheet__grab { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .5; margin: 4px auto 6px; }
 .sheet__head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
 .sheet__head h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }

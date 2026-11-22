@@ -15,9 +15,11 @@ export function parseNumber(text) {
 }
 
 /**
- * Fee the payment service (Alipay / WeChat Pay) adds for a foreign card.
- * A payment up to `freeBelow` yuan inclusive is free; above it the percent
- * applies to the WHOLE amount, not just the excess. Counted per payment.
+ * Fee added for paying with a foreign card, counted per payment.
+ * - A card linked in Pinduoduo itself: a percent of the amount, but not less
+ *   than `minimum` yuan (3%, at least 2 ¥).
+ * - Alipay / WeChat Pay: a payment up to `freeBelow` yuan inclusive is free;
+ *   above it the percent applies to the WHOLE amount, not just the excess.
  */
 export function paymentFee(amountCny, { percent, freeBelow, minimum }) {
   if (!(amountCny > 0) || percent <= 0) return 0;

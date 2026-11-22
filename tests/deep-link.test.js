@@ -148,7 +148,7 @@ test('buildLink puts the query after the page address', () => {
   state.shop.price = '450';
   assert.equal(
     buildLink(state, '/converter/'),
-    '/converter/?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=200&min=0&bank=0&buffer=2&delivery=off'
+    '/converter/?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off'
   );
 });
 

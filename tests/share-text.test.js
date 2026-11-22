@@ -74,22 +74,33 @@ test('converter: nothing to share without an amount or without rates', () => {
   assert.equal(converterShareText({ state, convert: () => null, t: ru, locale: 'ru-RU', url: 'u' }), null, 'no rates');
 });
 
-test('purchase: an order under the fee threshold', () => {
+test('purchase: the whole message with the shipped fee rule', () => {
   assert.equal(purchaseText({ price: '150' }), [
     '🛒 Покупка на 150,00 CNY',
     '',
     'Товар: 150,00 CNY',
-    'Комиссия оплаты: 0, до 200 ¥ бесплатно',
-    'Итого заказ: 150,00 CNY ≈ 21,43 USD',
-    'Спишется с карты: ≈ 21,43 USD',
-    'Запас на курс (2%): +0,43 USD',
+    'Комиссия оплаты (3%): +4,50 CNY',
+    'Итого заказ: 154,50 CNY ≈ 22,07 USD',
+    'Спишется с карты: ≈ 22,07 USD',
+    'Запас на курс (2%): +0,44 USD',
     '',
-    '💳 Пополнить карту: 22,00 USD ≈ 264 000 UZS',
+    '💳 Пополнить карту: 23,00 USD ≈ 276 000 UZS',
     '📊 1 USD = 7,00 CNY · 1 CNY = 1 714,29 UZS',
     '',
     '🔗 Открыть расчёт в CartRate:',
-    'https://example.com/converter/?mode=purchase&price=150&cur=CNY&card=USD&fee=3&free=200&min=0&bank=0&buffer=2&delivery=off'
+    'https://example.com/converter/?mode=purchase&price=150&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off'
   ].join('\n'));
+});
+
+test('purchase: the fee line names the minimum or the free threshold', () => {
+  const small = purchaseText({ price: '30' });
+  assert.match(small, /\nКомиссия оплаты \(минимум\): \+2,00 CNY\n/);
+  assert.match(small, /\nИтого заказ: 32,00 CNY ≈ 4,57 USD\n/);
+
+  const wechat = purchaseText({ price: '150', freeBelow: '200', svcMin: '0' });
+  assert.match(wechat, /\nКомиссия оплаты: 0, до 200 ¥ бесплатно\n/);
+  assert.match(wechat, /\n💳 Пополнить карту: 22,00 USD ≈ 264 000 UZS\n/);
+  assert.match(wechat, /fee=3&free=200&min=0/);
 });
 
 test('purchase: fee, bank fee and delivery paid separately', () => {
@@ -107,7 +118,7 @@ test('purchase: fee, bank fee and delivery paid separately', () => {
 test('purchase: delivery on the same card goes into the breakdown', () => {
   const text = purchaseText({ price: '150', dlOn: true, dlWeight: '0.34', dlPayCard: true });
   assert.match(text, /\nДоставка iPost \(авиа\): \+4,00 USD\n/);
-  assert.match(text, /\n💳 Пополнить карту: 26,00 USD/);
+  assert.match(text, /\n💳 Пополнить карту: 27,00 USD/);
   assert.equal(text.includes('🧾'), false, 'one payment: no separate total');
   assert.equal(text.includes('оплата отдельно'), false);
 });

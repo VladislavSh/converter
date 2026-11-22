@@ -57,7 +57,10 @@ const shell = createShell(app, {
   onRefresh: () => refreshRates({ manual: true }),
   onLanguageChange: renderAll,
   // the converter may have been built while its tab was hidden (zero widths)
-  onViewChange: view => { if (view === 'convert') converter.render(); }
+  onViewChange: view => {
+    if (view === 'convert') converter.render();
+    else purchase.takeAmount(); // the amount typed on the main screen becomes the price
+  }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
 const converter = createConverterView(app, { onEditList: () => picker.open() });
