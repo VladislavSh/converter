@@ -62,7 +62,8 @@ test('converter: broken values are ignored one by one', () => {
 test('a purchase link opens the tab with every field of the form', () => {
   const { applied, state } = open(
     '?mode=purchase&price=450&cur=CNY&card=UZS&fee=3&free=0&min=0&bank=1.5&buffer=2' +
-    '&delivery=road&weight=1250&unit=g&air=11&road=7&step=0.5&paycard=1'
+    '&delivery=road&weight=1250&unit=g&air=11&road=7&step=0.5&paycard=1' +
+    '&big=1&len=60&wid=50&hei=40&vdiv=5000&vfree=0'
   );
   assert.equal(applied, true);
   assert.equal(state.view, 'shop');
@@ -70,7 +71,8 @@ test('a purchase link opens the tab with every field of the form', () => {
     price: '450', priceCur: 'CNY', card: 'UZS',
     svcPct: '3', freeBelow: '0', svcMin: '0', bankPct: '1.5', bufPct: '2',
     dlOn: true, dlMethod: 'auto', dlWeight: '1250', dlUnit: 'g',
-    dlAir: '11', dlAuto: '7', dlStep: '0.5', dlPayCard: true
+    dlAir: '11', dlAuto: '7', dlStep: '0.5', dlPayCard: true,
+    dlBig: true, dlLen: '60', dlWid: '50', dlHei: '40', dlDiv: '5000', dlVolFree: '0'
   });
 });
 

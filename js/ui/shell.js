@@ -2,6 +2,7 @@
 // screen, footer and installing the app to the home screen.
 import { APP_NAME, APP_VERSION, RATE_SOURCES } from '../config.js';
 import { INSTALL_STEPS, installPlatform, isInstalled } from '../core/install.js';
+import { VIEWS } from '../core/state.js';
 import { $, $$, createSheet } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
@@ -22,7 +23,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     statusText: $('#status-text'),
     refresh: $('#refresh-btn'),
     tabs: $$('.view-tab'),
-    views: { convert: $('#view-convert'), shop: $('#view-shop') },
+    views: { convert: $('#view-convert'), shop: $('#view-shop'), banks: $('#view-banks') },
     installButtons: $$('[data-install]'),
     installSteps: $('#install-steps'),
     source: $('#source-text'),
@@ -82,7 +83,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   }
 
   function setView(view) {
-    app.state.view = view === 'shop' ? 'shop' : 'convert';
+    app.state.view = VIEWS.includes(view) ? view : 'convert';
     el.tabs.forEach(tab => {
       const active = tab.dataset.view === app.state.view;
       tab.classList.toggle('is-active', active);

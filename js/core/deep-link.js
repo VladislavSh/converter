@@ -9,8 +9,8 @@ import { evaluate, sanitizeExpression } from './expression.js';
 import { isCurrencyCode } from './rates.js';
 import { SHOP_ENUMS } from './state.js';
 
-const VIEW_BY_MODE = { converter: 'convert', purchase: 'shop' };
-const MODE_BY_VIEW = { convert: 'converter', shop: 'purchase' };
+const VIEW_BY_MODE = { converter: 'convert', purchase: 'shop', banks: 'banks' };
+const MODE_BY_VIEW = { convert: 'converter', shop: 'purchase', banks: 'banks' };
 const MAX_CURRENCIES = 30;
 const MAX_TEXT = 60;
 const MAX_QUERY = 2000;
@@ -19,7 +19,8 @@ const DEFAULT_AMOUNT = '100';
 // Purchase form: link parameter → field of state.shop
 const SHOP_AMOUNTS = {
   price: 'price', fee: 'svcPct', free: 'freeBelow', min: 'svcMin', bank: 'bankPct', buffer: 'bufPct',
-  weight: 'dlWeight', air: 'dlAir', road: 'dlAuto'
+  weight: 'dlWeight', air: 'dlAir', road: 'dlAuto',
+  len: 'dlLen', wid: 'dlWid', hei: 'dlHei', vdiv: 'dlDiv', vfree: 'dlVolFree'
 };
 const SHOP_CHOICES = { cur: 'priceCur', card: 'card', unit: 'dlUnit', step: 'dlStep' };
 
@@ -71,6 +72,8 @@ function applyPurchase(shop, params) {
   }
   const payCard = params.get('paycard');
   if (payCard === '1' || payCard === '0') shop.dlPayCard = payCard === '1';
+  const big = params.get('big');
+  if (big === '1' || big === '0') shop.dlBig = big === '1';
 
   const delivery = params.get('delivery');
   if (delivery === 'air' || delivery === 'road') {
@@ -78,7 +81,7 @@ function applyPurchase(shop, params) {
     shop.dlMethod = delivery === 'air' ? 'air' : 'auto';
   } else if (delivery === 'off') {
     // The same as turning the switch off in the form: nothing of it is kept
-    Object.assign(shop, { dlOn: false, dlWeight: '', dlPayCard: false });
+    Object.assign(shop, { dlOn: false, dlWeight: '', dlPayCard: false, dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
   }
 }
 
@@ -100,7 +103,7 @@ export function applyDeepLink(state, search, isKnown = () => true) {
 
   state.view = VIEW_BY_MODE[mode];
   if (state.view === 'convert') applyConverter(state, params, isKnown);
-  else applyPurchase(state.shop, params);
+  else if (state.view === 'shop') applyPurchase(state.shop, params);
   // The numbers of a link are only the same with the rate it was made with
   adoptLinkedRate(state, params.get('xr'), params.get('xrname'), code => isCurrencyCode(code) && isKnown(code));
   return true;
@@ -109,7 +112,9 @@ export function applyDeepLink(state, search, isKnown = () => true) {
 /** The query string that reproduces the open tab, e.g. "mode=converter&amount=100&…". */
 export function buildQuery(state) {
   const params = new URLSearchParams();
-  if (state.view === 'shop') {
+  if (state.view === 'banks') {
+    params.set('mode', MODE_BY_VIEW.banks);
+  } else if (state.view === 'shop') {
     const shop = state.shop;
     params.set('mode', MODE_BY_VIEW.shop);
     params.set('price', shop.price);
@@ -128,6 +133,14 @@ export function buildQuery(state) {
       params.set('road', shop.dlAuto);
       params.set('step', shop.dlStep);
       params.set('paycard', shop.dlPayCard ? '1' : '0');
+      params.set('big', shop.dlBig ? '1' : '0');
+      if (shop.dlBig) {
+        params.set('len', shop.dlLen);
+        params.set('wid', shop.dlWid);
+        params.set('hei', shop.dlHei);
+        params.set('vdiv', shop.dlDiv);
+        params.set('vfree', shop.dlVolFree);
+      }
     } else {
       params.set('delivery', 'off');
     }

@@ -1,10 +1,11 @@
-// Network access. These three public APIs are the only hosts the app ever
-// contacts; responses are validated in core/rates.js.
+// Network access for the market rates. These three public APIs and the two
+// banks (services/bank-rates-api.js) are the only hosts the app ever contacts;
+// responses are validated in core/rates.js and core/bank-rates.js.
 import { RATE_SOURCES, TIMING } from '../config.js';
 import { CRYPTO } from '../data/currencies.js';
 import { cleanRates, cryptoRatesFromPrices, mergeRates } from '../core/rates.js';
 
-async function fetchJson(url, timeoutMs = TIMING.fetchTimeoutMs) {
+export async function fetchJson(url, timeoutMs = TIMING.fetchTimeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

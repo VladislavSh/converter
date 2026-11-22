@@ -33,7 +33,26 @@ export function roundWeightUp(kg, stepKg) {
   return Math.round(Math.ceil(kg / stepKg - EPSILON) * stepKg * 1000) / 1000;
 }
 
-/** iPost delivery, billed in USD per kg. Costs are 0 while delivery is off. */
+/**
+ * Volume of an oversized parcel and its volumetric weight, or null when the
+ * dimensions are not filled in (or oversize is off).
+ * @returns {{volumeM3: number, volumetricKg: number, divisor: number, freeKg: number}|null}
+ */
+export function parcelVolume(shop) {
+  if (!shop.dlBig) return null;
+  const [length, width, height] = [shop.dlLen, shop.dlWid, shop.dlHei].map(parseNumber);
+  const divisor = parseNumber(shop.dlDiv);
+  if (!(length > 0 && width > 0 && height > 0 && divisor > 0)) return null;
+  const cm3 = length * width * height;
+  return { volumeM3: cm3 / 1e6, volumetricKg: cm3 / divisor, divisor, freeKg: parseNumber(shop.dlVolFree) };
+}
+
+/**
+ * Delivery from China, billed in USD per kg. Costs are 0 while delivery is off.
+ * An oversized parcel is billed by the greater of its actual and volumetric
+ * weight — unless it weighs no more than `dlVolFree` kg, then the box size does
+ * not count at all.
+ */
 export function calcDelivery(shop) {
   const airRate = parseNumber(shop.dlAir);
   const autoRate = parseNumber(shop.dlAuto);
@@ -42,7 +61,7 @@ export function calcDelivery(shop) {
   const otherRate = method === 'air' ? autoRate : airRate;
   const result = {
     on: Boolean(shop.dlOn), method, airRate, autoRate, rate, otherRate,
-    kg: 0, billedKg: 0, cost: 0, otherCost: 0
+    kg: 0, billedKg: 0, cost: 0, otherCost: 0, volume: null
   };
   if (!result.on) return result;
 
@@ -50,8 +69,16 @@ export function calcDelivery(shop) {
   const kg = Math.max(0, shop.dlUnit === 'g' ? weight / 1000 : weight);
   if (!(kg > 0)) return result;
 
-  const billedKg = roundWeightUp(kg, parseFloat(shop.dlStep) || 0);
-  return { ...result, kg, billedKg, cost: billedKg * rate, otherCost: billedKg * otherRate };
+  let chargeKg = kg;
+  let volume = parcelVolume(shop);
+  if (volume) {
+    const counted = kg > volume.freeKg;
+    const larger = volume.volumetricKg > kg + EPSILON;
+    volume = { ...volume, counted, byVolume: counted && larger, ignored: !counted && larger };
+    if (volume.byVolume) chargeKg = volume.volumetricKg;
+  }
+  const billedKg = roundWeightUp(chargeKg, parseFloat(shop.dlStep) || 0);
+  return { ...result, kg, billedKg, cost: billedKg * rate, otherCost: billedKg * otherRate, volume };
 }
 
 /**

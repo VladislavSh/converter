@@ -119,6 +119,19 @@ export function saveCustomRate(state, draft) {
   return { ok: true, id };
 }
 
+/**
+ * Switches on a rate offered by name ("CBU" for USD → UZS): the saved rate of
+ * that name and pair is updated to today's value, or a new one is saved.
+ * @returns {{ok: true, id: string}|{ok: false, error: string}}
+ */
+export function useNamedRate(state, { name, from, to, rate }) {
+  const same = (state.customRates ?? []).find(entry => entry.name === cleanName(name) && entry.from === from && entry.to === to);
+  if (!same) return saveCustomRate(state, { name, from, to, rate });
+  const outcome = saveCustomRate(state, { id: same.id, name, from, to, rate });
+  if (outcome.ok) state.rateId = same.id;
+  return outcome;
+}
+
 /** Deletes a saved rate; if it was switched on, the market rates come back. */
 export function removeCustomRate(state, id) {
   const list = state.customRates ?? [];

@@ -6,14 +6,22 @@ import { cleanCustomRates } from './custom-rates.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
-export const STATE_VERSION = 9;
+export const STATE_VERSION = 10;
+
+/** The tabs: converter, purchase, banks. */
+export const VIEWS = Object.freeze(['convert', 'shop', 'banks']);
 
 // The fee defaults are for a card linked in Pinduoduo itself: 3%, at least 2 ¥
 export const SHOP_DEFAULTS = Object.freeze({
   price: '', priceCur: 'CNY', card: 'USD',
   svcPct: '3', freeBelow: '0', svcMin: '2', bankPct: '0', bufPct: '2',
   dlOn: false, dlMethod: 'air', dlWeight: '', dlUnit: 'kg',
-  dlAir: '10', dlAuto: '6', dlStep: '0.1', dlPayCard: false
+  // Published cargo rates China → Uzbekistan (air 9.9 $/kg, road 6 $/kg); all editable
+  dlAir: '9.9', dlAuto: '6', dlStep: '0.1', dlPayCard: false,
+  // Oversized parcels: volumetric weight = L × W × H (cm) / divisor, counted
+  // only for parcels heavier than dlVolFree kg (the carrier's rule: up to 15 kg
+  // the box size does not matter)
+  dlBig: false, dlLen: '', dlWid: '', dlHei: '', dlDiv: '6000', dlVolFree: '15'
 });
 
 /** Currencies an item price can be entered in (the options of the price select). */
@@ -27,7 +35,7 @@ export const SHOP_ENUMS = {
   dlUnit: ['g', 'kg'],
   dlStep: ['0.1', '0.5', '1', '0']
 };
-const SHOP_FLAGS = ['dlOn', 'dlPayCard'];
+const SHOP_FLAGS = ['dlOn', 'dlPayCard', 'dlBig'];
 const MAX_TEXT = 60;
 
 // The default list before v7; those two extra entries are dropped on upgrade.
@@ -76,6 +84,8 @@ function migrate(state, fromVersion) {
   // v8: the default rule is the one of a card linked in Pinduoduo (3%, at least
   // 2 ¥). A rule the user typed in themselves is left alone.
   if (fromVersion < 8 && EARLIER_FEE_PRESETS.includes(feeRule(state.shop))) resetFeeRule(state.shop);
+  // v10: the air rate went from 10 to 9.9 $/kg; a rate typed by hand stays
+  if (fromVersion < 10 && parseNumber(state.shop.dlAir) === 10) state.shop.dlAir = SHOP_DEFAULTS.dlAir;
 }
 
 /**
@@ -104,7 +114,7 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     v: STATE_VERSION,
     theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : (prefersLight ? 'light' : 'dark'),
     lang: raw.lang === 'ru' || raw.lang === 'en' ? raw.lang : (/^(ru|uk|be|kk|uz)/i.test(language) ? 'ru' : 'en'),
-    view: raw.view === 'shop' ? 'shop' : 'convert',
+    view: VIEWS.includes(raw.view) ? raw.view : 'convert',
     list: cleanList(raw.list),
     base: isCurrencyCode(raw.base) ? raw.base : DEFAULT_LIST[0],
     input: cleanText(raw.input, '100'),

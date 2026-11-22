@@ -23,7 +23,7 @@ function converterText(overrides = {}, t = ru, locale = 'ru-RU') {
 
 function purchaseText(shop, t = ru, locale = 'ru-RU') {
   const state = buildState(null);
-  Object.assign(state, { view: 'shop', shop: { ...SHOP_DEFAULTS, ...shop } });
+  Object.assign(state, { view: 'shop', shop: { ...SHOP_DEFAULTS, dlAir: '10', ...shop } });
   return plain(purchaseShareText({ result: calcPurchase(state.shop, cv), convert: cv, t, locale, url: buildLink(state, BASE) }));
 }
 
@@ -109,15 +109,15 @@ test('purchase: fee, bank fee and delivery paid separately', () => {
   assert.match(text, /\nКомиссия оплаты \(3%\): \+13,50 CNY\n/);
   assert.match(text, /\nИтого заказ: 463,50 CNY ≈ 66,21 USD\n/);
   assert.match(text, /\nКомиссия банка \(1,5%\): \+0,99 USD\n/);
-  assert.match(text, /\n🚚 Доставка iPost, авиа, 0,4 кг: 4,00 USD \(оплата отдельно\)\n/);
+  assert.match(text, /\n🚚 Доставка, авиа, 0,4 кг: 4,00 USD \(оплата отдельно\)\n/);
   assert.match(text, /\n💳 Пополнить карту: 69,00 USD ≈ 828 000 UZS\n/);
   assert.match(text, /\n🧾 Всего понадобится: 73,00 USD ≈ 876 000 UZS\n/, '69 + 4');
-  assert.match(text, /delivery=air&weight=0\.34&unit=kg&air=10&road=6&step=0\.1&paycard=0$/);
+  assert.match(text, /delivery=air&weight=0\.34&unit=kg&air=10&road=6&step=0\.1&paycard=0&big=0$/);
 });
 
 test('purchase: delivery on the same card goes into the breakdown', () => {
   const text = purchaseText({ price: '150', dlOn: true, dlWeight: '0.34', dlPayCard: true });
-  assert.match(text, /\nДоставка iPost \(авиа\): \+4,00 USD\n/);
+  assert.match(text, /\nДоставка \(авиа\): \+4,00 USD\n/);
   assert.match(text, /\n💳 Пополнить карту: 27,00 USD/);
   assert.equal(text.includes('🧾'), false, 'one payment: no separate total');
   assert.equal(text.includes('оплата отдельно'), false);
@@ -125,8 +125,8 @@ test('purchase: delivery on the same card goes into the breakdown', () => {
 
 test('purchase: delivery alone, and English', () => {
   const text = purchaseText({ dlOn: true, dlMethod: 'auto', dlUnit: 'g', dlWeight: '1250' }, en, 'en-US');
-  assert.match(text, /^🚚 iPost delivery\n/);
-  assert.match(text, /\n🚚 iPost delivery, road, 1\.3 kg: 7\.80 USD \(paid separately\)\n/);
+  assert.match(text, /^🚚 Delivery\n/);
+  assert.match(text, /\n🚚 Delivery, road, 1\.3 kg: 7\.80 USD \(paid separately\)\n/);
   assert.match(text, /\n🧾 Total needed: 7\.80 USD ≈ 93,600 UZS\n/);
   assert.equal(text.includes('💳'), false, 'nothing to top up');
 });
@@ -150,7 +150,7 @@ test('the message is ready for a chat: short lines, a link that opens the same n
   assert.equal(/\s/.test(link), false, 'the link has no spaces, so it stays clickable');
   const opened = buildState(null);
   assert.equal(applyDeepLink(opened, new URL(link).search), true);
-  assert.deepEqual(opened.shop, { ...SHOP_DEFAULTS, ...shop }, 'the link reproduces the calculation');
+  assert.deepEqual(opened.shop, { ...SHOP_DEFAULTS, dlAir: '10', ...shop }, 'the link reproduces the calculation');
 });
 
 test('the screen and the message show the same breakdown', () => {

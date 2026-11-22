@@ -13,7 +13,8 @@ const noRates = () => null;
 // Most scenarios below use the WeChat Pay / Alipay rule (free up to 200 ¥).
 // The rule the app ships with — a card linked in Pinduoduo — has tests of its own.
 const WECHAT = { svcPct: '3', freeBelow: '200', svcMin: '0' };
-const shop = overrides => ({ ...SHOP_DEFAULTS, ...WECHAT, ...overrides });
+// Air at a round 10 $/kg keeps the delivery sums easy to check by hand
+const shop = overrides => ({ ...SHOP_DEFAULTS, ...WECHAT, dlAir: '10', ...overrides });
 const shipped = overrides => ({ ...SHOP_DEFAULTS, ...overrides });
 const close = (actual, expected, message) =>
   assert.ok(Math.abs(actual - expected) < 1e-6, `${message ?? ''} ${actual} ≉ ${expected}`);
@@ -206,7 +207,7 @@ test('delivery only, paid separately: nothing to top up', () => {
 test('delivery only, paid with a USD card: exact amount, no rate buffer', () => {
   const r = calcPurchase(shop({ dlOn: true, dlWeight: '0.34', dlPayCard: true }), cv);
   assert.equal(r.deliveryOnCard, true);
-  assert.equal(r.buffer, 0, 'iPost bills in USD, a USD card converts nothing');
+  assert.equal(r.buffer, 0, 'delivery is billed in USD, a USD card converts nothing');
   assert.equal(r.topup, 4);
   assert.equal(r.summary, null);
 });

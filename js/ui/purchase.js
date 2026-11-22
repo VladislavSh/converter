@@ -36,6 +36,14 @@ export function createPurchaseView(app, { keypad }) {
     dlAuto: $('#dl-auto'),
     dlStep: $('#dl-step'),
     dlPayCard: $('#dl-paycard'),
+    dlBig: $('#dl-big'),
+    dlBigBody: $('#dl-big-body'),
+    dlBigNote: $('#dl-big-note'),
+    dlLen: $('#dl-len'),
+    dlWid: $('#dl-wid'),
+    dlHei: $('#dl-hei'),
+    dlDiv: $('#dl-div'),
+    dlVolFree: $('#dl-vfree'),
     dlRows: $('#dl-break'),
     rows: $('#sh-break'),
     topup: $('#sh-topup'),
@@ -50,7 +58,8 @@ export function createPurchaseView(app, { keypad }) {
   const TEXT_FIELDS = [
     [el.price, 'price'], [el.feePercent, 'svcPct'], [el.feeFree, 'freeBelow'], [el.feeMin, 'svcMin'],
     [el.bank, 'bankPct'], [el.buffer, 'bufPct'],
-    [el.dlWeight, 'dlWeight'], [el.dlAir, 'dlAir'], [el.dlAuto, 'dlAuto']
+    [el.dlWeight, 'dlWeight'], [el.dlAir, 'dlAir'], [el.dlAuto, 'dlAuto'],
+    [el.dlLen, 'dlLen'], [el.dlWid, 'dlWid'], [el.dlHei, 'dlHei'], [el.dlDiv, 'dlDiv'], [el.dlVolFree, 'dlVolFree']
   ];
   // Button groups where exactly one option is selected
   const CHOICES = [[el.card, 'card'], [el.dlMethod, 'dlMethod'], [el.dlUnit, 'dlUnit']];
@@ -79,6 +88,13 @@ export function createPurchaseView(app, { keypad }) {
     }
     el.dlOn.checked = s.dlOn;
     el.dlPayCard.checked = s.dlPayCard;
+    el.dlBig.checked = s.dlBig;
+    el.dlBigBody.hidden = !s.dlBig;
+    const freeKg = parseNumber(s.dlVolFree);
+    el.dlBigNote.textContent = app.t(freeKg > 0 ? 'dlBigNote' : 'dlBigNoteAll', {
+      div: formatNumber(parseNumber(s.dlDiv), app.locale(), 0),
+      free: `${formatNumber(freeKg, app.locale(), 2)} ${app.t('dlKg')}`
+    });
     el.dlBody.hidden = !s.dlOn;
     el.dlHint.hidden = s.dlOn;
   }
@@ -102,7 +118,18 @@ export function createPurchaseView(app, { keypad }) {
       billed += ` <span class="rrow__note">${escapeHtml(t('dlFact', { w: actual }))}</span>`;
     }
     const inUzs = app.convert(delivery.cost, 'USD', 'UZS');
+    // An oversized parcel: its volume, its volumetric weight and whether that is billed
+    const volumeRows = [];
+    const { volume } = delivery;
+    if (volume) {
+      volumeRows.push(rowHtml(t('dlVolume'), `${formatNumber(volume.volumeM3, locale, 3)} ${t('dlM3')}`));
+      let note = t('dlVolLess');
+      if (volume.byVolume) note = t('dlVolCounted');
+      else if (volume.ignored) note = t('dlVolIgnored', { free: kilos(volume.freeKg) });
+      volumeRows.push(rowHtml(t('dlVolWeight'), `${kilos(volume.volumetricKg)} <span class="rrow__note">${escapeHtml(note)}</span>`));
+    }
     const rows = [
+      ...volumeRows,
       rowHtml(t('dlBilled'), billed),
       rowHtml(
         t('dlCost', { method: methodName(delivery.method).toLowerCase() }),
@@ -337,12 +364,14 @@ export function createPurchaseView(app, { keypad }) {
   el.dlOn.addEventListener('change', () => {
     shop().dlOn = el.dlOn.checked;
     if (!el.dlOn.checked) {
-      Object.assign(shop(), { dlWeight: '', dlPayCard: false });
-      el.dlWeight.value = '';
+      // The parcel's own data goes; the rates and the volume settings stay
+      Object.assign(shop(), { dlWeight: '', dlPayCard: false, dlBig: false, dlLen: '', dlWid: '', dlHei: '' });
+      for (const input of [el.dlWeight, el.dlLen, el.dlWid, el.dlHei]) input.value = '';
     }
     changed();
   });
   el.dlPayCard.addEventListener('change', () => { shop().dlPayCard = el.dlPayCard.checked; changed(); });
+  el.dlBig.addEventListener('change', () => { shop().dlBig = el.dlBig.checked; changed(); });
 
   return { render, takeAmount };
 }

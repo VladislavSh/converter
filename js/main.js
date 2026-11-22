@@ -11,6 +11,7 @@ import { adoptEarlierStorage, clearSessionFlag, readJson, takeSessionFlag, write
 import { registerServiceWorker } from './services/sw-update.js';
 import { createUrlSync, currentLink } from './services/url-sync.js';
 import { installFlagFallback } from './ui/badge.js';
+import { createBanksView } from './ui/banks.js';
 import { createConverterView } from './ui/converter.js';
 import { createKeypad } from './ui/keypad.js';
 import { $, createToast, shareText } from './ui/dom.js';
@@ -83,22 +84,26 @@ const shell = createShell(app, {
   // the converter may have been built while its tab was hidden (zero widths)
   onViewChange: view => {
     if (view === 'convert') converter.render();
-    else purchase.takeAmount(); // the amount typed on the main screen becomes the price
+    else if (view === 'shop') purchase.takeAmount(); // the amount typed on the main screen becomes the price
+    else banks.refresh();
   }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
 const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
 const purchase = createPurchaseView(app, { keypad });
 const customRates = createRatesView(app, { onChange: renderAll });
+const banks = createBanksView(app, { onRateChange: renderAll });
 
 function renderAll() {
   converter.render();
   purchase.render();
   customRates.render();
+  banks.render();
 }
 
 let refreshing = false;
 async function refreshRates({ manual = false } = {}) {
+  if (manual && state.view === 'banks') banks.refresh({ force: true });
   if (refreshing) return;
   refreshing = true;
   shell.setRefreshing(true);
@@ -133,6 +138,7 @@ shell.setView(state.view);
 shell.applyTexts();
 shell.setStatus(snapshot ? (navigator.onLine ? 'ok' : 'offline') : 'loading');
 renderAll();
+if (state.view === 'banks') banks.refresh();
 
 if (takeSessionFlag(STORAGE_KEYS.updatedFlag)) {
   setTimeout(() => app.toast(app.t('updatedTo', { v: APP_VERSION })), TIMING.splashMaxCachedMs);

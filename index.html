@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Only our own files + the three public rate APIs; no third-party scripts, fonts or images -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.exchangerate.fun https://open.er-api.com https://api.coingecko.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.exchangerate.fun https://open.er-api.com https://api.coingecko.com https://cbu.uz https://nbu.uz; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>CartRate — конвертер валют</title>
   <meta name="description" content="Конвертер валют и расчёт покупок: комиссии, доставка и сумма пополнения карты">
@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.11.0"></script>
-  <script src="js/boot-guard.js?v=1.11.0"></script>
-  <script src="js/install-early.js?v=1.11.0"></script>
+  <script src="js/theme-init.js?v=1.12.0"></script>
+  <script src="js/boot-guard.js?v=1.12.0"></script>
+  <script src="js/install-early.js?v=1.12.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.11.0">
+  <link rel="stylesheet" href="css/style.css?v=1.12.0">
 </head>
 <body>
 
@@ -75,6 +75,7 @@
     <nav class="views" role="tablist">
       <button type="button" class="view-tab is-active" role="tab" id="tab-convert" aria-controls="view-convert" aria-selected="true" data-view="convert" data-i18n="viewConvert">Конвертер</button>
       <button type="button" class="view-tab" role="tab" id="tab-shop" aria-controls="view-shop" aria-selected="false" data-view="shop" data-i18n="viewPurchase">Покупка</button>
+      <button type="button" class="view-tab" role="tab" id="tab-banks" aria-controls="view-banks" aria-selected="false" data-view="banks" data-i18n="viewBanks">Банки</button>
     </nav>
 
     <!-- Which rates the calculations use: the market ones or one of the user's own -->
@@ -182,7 +183,7 @@
 
       <div class="card">
         <div class="card__head">
-          <h2 class="card__title" id="dl-title" data-i18n="dlTitle">Доставка iPost</h2>
+          <h2 class="card__title" id="dl-title" data-i18n="dlTitle">Доставка</h2>
           <label class="switch">
             <input type="checkbox" id="dl-on" data-i18n-aria="dlToggle" aria-label="Учитывать доставку">
             <span></span>
@@ -211,6 +212,38 @@
                 <button type="button" data-val="kg" data-i18n="dlKg">кг</button>
               </div>
             </div>
+          </div>
+          <label class="check-row">
+            <input type="checkbox" id="dl-big">
+            <span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+            <span data-i18n="dlBig">Крупногабарит — учитывать размеры</span>
+          </label>
+          <div id="dl-big-body" hidden>
+            <div class="grid3">
+              <div class="field">
+                <label for="dl-len" data-i18n="dlLen">Длина, см</label>
+                <input id="dl-len" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="dl-wid" data-i18n="dlWid">Ширина, см</label>
+                <input id="dl-wid" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="dl-hei" data-i18n="dlHei">Высота, см</label>
+                <input id="dl-hei" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="dl-div" data-i18n="dlDiv">Делитель объёма</label>
+                <input id="dl-div" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="dl-vfree" data-i18n="dlVolFree">Без объёма до, кг</label>
+                <input id="dl-vfree" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+              </div>
+            </div>
+            <p class="card__note" id="dl-big-note"></p>
           </div>
           <div class="grid3">
             <div class="field">
@@ -265,6 +298,37 @@
       </div>
 
       <p class="hint" data-i18n="shHint">Комиссия считается с каждой оплаты отдельно. Пополнение округлено вверх с запасом: курс Visa и банка может отличаться от рыночного.</p>
+    </section>
+
+    <!-- Banks: official rates of the Central Bank and the National Bank's board -->
+    <section class="banks" id="view-banks" role="tabpanel" aria-labelledby="tab-banks" hidden>
+      <div class="card">
+        <div class="bank__head">
+          <div>
+            <h2 class="card__title" data-i18n="bankCbu">ЦБ Узбекистана</h2>
+            <p class="bank__sub" id="bank-cbu-sub"></p>
+          </div>
+          <a class="link-btn" id="bank-cbu-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite">Сайт банка</a>
+        </div>
+        <ul class="bank__rates" id="bank-cbu-rates"></ul>
+      </div>
+      <div class="card">
+        <div class="bank__head">
+          <div>
+            <h2 class="card__title" data-i18n="bankNbu">Национальный банк (НБУ)</h2>
+            <p class="bank__sub" id="bank-nbu-sub"></p>
+          </div>
+          <a class="link-btn" id="bank-nbu-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite">Сайт банка</a>
+        </div>
+        <ul class="bank__rates" id="bank-nbu-rates"></ul>
+      </div>
+      <div class="conv__actions">
+        <button type="button" class="ghost-btn" id="bank-more">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          <span data-i18n="bankLess">Свернуть</span>
+        </button>
+      </div>
+      <p class="hint" data-i18n="bankHint">ЦБ — официальный курс.</p>
     </section>
 
     <div class="status" id="status" data-mood="loading">
@@ -410,6 +474,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.11.0"></script>
+<script type="module" src="js/main.js?v=1.12.0"></script>
 </body>
 </html>
