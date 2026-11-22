@@ -74,6 +74,32 @@ test('a bank is a whole source: all its rates go into the calculations at once, 
   assert.equal(resolveSource(state, banks).missing, true);
 });
 
+test('Kapitalbank\'s missing yuan comes from the National Bank, on the same side', () => {
+  const MARKET = { USD: 1, CNY: 7, UZS: 12000, RUB: 80 };
+  const kapitalApi = { ts: 1, date: '22.11.2026', rates: [{ code: 'USD', nominal: 1, buy: 11970, sell: 12050 }, { code: 'RUB', nominal: 1, buy: 118, sell: 143 }] };
+  const nbuApi = { ...parseRatesApi(NBU_ANSWER), ts: 2 };
+  const state = buildState(null);
+  selectSource(state, KAPITAL_API);
+
+  const sell = resolveSource(state, { kapitalApi, nbuApi }).source;
+  assert.deepEqual(sell.borrowed.from, NBU_API);
+  assert.deepEqual(sell.borrowed.codes, ['EUR', 'KZT', 'GBP', 'CHF', 'JPY', 'CNY'], 'only what Kapitalbank lacks');
+  const cv = (source, value, from, to) => convert(sourceTable(MARKET, source), value, from, to);
+  assert.equal(cv(sell, 1, 'USD', 'UZS'), 12050, 'the dollar stays Kapitalbank\'s');
+  assert.ok(Math.abs(cv(sell, 1, 'RUB', 'UZS') - 143) < 1e-6, 'so does the rouble');
+  assert.ok(Math.abs(cv(sell, 1, 'CNY', 'UZS') - 1855) < 1e-6, 'the NBU yuan, sell');
+  const buy = resolveSource(state, { kapitalApi, nbuApi }, 'buy').source;
+  assert.ok(Math.abs(cv(buy, 1, 'CNY', 'UZS') - 1640) < 1e-6, 'the NBU yuan, buy');
+  assert.notEqual(sell.ts, resolveSource(state, { kapitalApi, nbuApi: { ...nbuApi, ts: 3 } }).source.ts, 'a new NBU board rebuilds the tables');
+
+  const alone = resolveSource(state, { kapitalApi, nbuApi: null }).source;
+  assert.equal(alone.borrowed, undefined, 'NBU not loaded: the yuan is the market one');
+  assert.ok(Math.abs(cv(alone, 1, 'CNY', 'UZS') - 12050 / 7) < 1e-6);
+
+  selectSource(state, NBU_API);
+  assert.equal(resolveSource(state, { kapitalApi, nbuApi }).source.borrowed, undefined, 'the NBU borrows from nobody');
+});
+
 test('the Banks tab has its own link', () => {
   const state = buildState(null);
   state.view = 'banks';

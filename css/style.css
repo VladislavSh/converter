@@ -546,6 +546,12 @@ body[data-view="banks"] .rate-bar { display: none; }
 .res__head { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; color: var(--text-2); }
 .res__head .res__name { font-weight: 700; color: var(--text); }
 .res__head i { flex: none; font-style: normal; font-size: 11.5px; font-weight: 800; letter-spacing: .05em; color: var(--text-3); }
+/* a currency the bank lacks, priced by the National Bank */
+.res__from {
+  flex: none; align-self: center; margin-left: auto; padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .03em; white-space: nowrap;
+  color: var(--link); background: rgba(124, 92, 255, .12); border: 1px solid rgba(124, 92, 255, .28);
+}
 .res__sides { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
 .res__side {
   position: relative; min-width: 0; display: grid; gap: 1px; padding: 8px 10px 7px; border-radius: 14px;

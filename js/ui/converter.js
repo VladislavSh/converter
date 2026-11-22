@@ -49,12 +49,20 @@ export function createConverterView(app, { onEditList, keypad }) {
       <span class="res__rate" data-role="rate"></span>
     </span>`;
 
+  /** A currency the bank does not quote, priced by the bank it borrows from: "курс НБУ". */
+  const borrowedTag = code => {
+    const borrowed = app.rateSource().source?.borrowed;
+    if (!borrowed?.codes.includes(code)) return '';
+    const hint = app.t('borrowedHint', { name: app.sourceName(app.state.rateSource), from: app.sourceName(borrowed.from) });
+    return `<span class="res__from" title="${escapeHtml(hint)}">${escapeHtml(app.t('borrowedTag'))}</span>`;
+  };
+
   function resultHtml(code, index, twoSided) {
     const { t } = app;
     const name = escapeHtml(currencyName(code, app.state.lang));
     const body = twoSided
       ? `
-            <span class="res__head"><span class="res__name">${name}</span><i>${code}</i></span>
+            <span class="res__head"><span class="res__name">${name}</span><i>${code}</i>${borrowedTag(code)}</span>
             <span class="res__sides">${RATE_SIDES.map(sideHtml).join('')}</span>`
       : `
             <span class="res__value"><b data-role="value">—</b><i>${code}</i></span>
@@ -144,7 +152,8 @@ export function createConverterView(app, { onEditList, keypad }) {
     const { state } = app;
     const info = app.rateSource();
     const twoSided = info.twoSided && !info.missing;
-    const key = `${state.lang}|${state.base}|${state.list.join(',')}|${twoSided}`;
+    const borrowed = info.source?.borrowed?.codes.join(',') ?? '';
+    const key = `${state.lang}|${state.base}|${state.list.join(',')}|${twoSided}|${borrowed}`;
     if (key !== builtFor) {
       buildStructure(twoSided);
       builtFor = key;

@@ -1,7 +1,7 @@
 // App-wide constants. APP_VERSION must match VERSION in sw.js and the ?v=
 // query in index.html (tests/project.test.js checks this).
 export const APP_NAME = 'CartRate';
-export const APP_VERSION = '1.27.0';
+export const APP_VERSION = '1.28.0';
 
 export const STORAGE_KEYS = Object.freeze({
   state: 'cartrate_state',

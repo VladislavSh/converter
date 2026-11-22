@@ -8,8 +8,9 @@
 // The banks are counted by their sell prices (what the bank charges for a
 // currency, the higher one); only the converter's rows show both sums.
 // A source replaces the market rates of the currencies it has; the others keep
-// theirs (Kapitalbank has no yuan on bank.uz, so the yuan stays a market rate,
-// re-priced through the bank's dollar). Pure functions — no DOM, no storage.
+// theirs. Kapitalbank has no yuan on bank.uz, so its missing currencies are
+// taken from the National Bank first (BORROW_FROM), and only then from the
+// market. Pure functions — no DOM, no storage.
 import { evaluate } from './expression.js';
 import { isCurrencyCode } from './rates.js';
 
@@ -73,6 +74,30 @@ export function bankSource(board, side = DEFAULT_SIDE) {
 }
 
 /**
+ * Currencies a bank does not quote are taken from another bank before the
+ * market: Kapitalbank has no yuan on bank.uz, the National Bank has.
+ */
+export const BORROW_FROM = Object.freeze({ [KAPITAL_API]: NBU_API });
+
+/**
+ * The bank's source with the currencies it lacks added from the bank it borrows
+ * from (same side); `borrowed` lists them. Without that board: as it was.
+ */
+function withBorrowed(source, id, banks, side) {
+  const lender = BORROW_FROM[id];
+  const extra = source && lender ? bankSource(banks[lender], side) : null;
+  if (!extra) return source;
+  const added = extra.rates.filter(entry => !source.rates.some(own => own.code === entry.code));
+  if (!added.length) return source;
+  return {
+    ...source,
+    rates: [...source.rates, ...added],
+    borrowed: { from: lender, codes: added.map(entry => entry.code) },
+    ts: `${source.ts}+${extra.ts}` // the tables are rebuilt when either board changes
+  };
+}
+
+/**
  * The source the calculations use now.
  * @param {{nbuApi?: object|null, kapitalApi?: object|null}} banks  the loaded bank boards
  * @param {'buy'|'sell'} [side]  which prices of the bank
@@ -82,7 +107,7 @@ export function bankSource(board, side = DEFAULT_SIDE) {
 export function resolveSource(state, banks = {}, side = DEFAULT_SIDE) {
   const id = state.rateSource;
   if (BANK_SOURCES.includes(id)) {
-    const source = bankSource(banks[id], side);
+    const source = withBorrowed(bankSource(banks[id], side), id, banks, side);
     return { id, kind: 'bank', source, missing: !source, side, twoSided: true };
   }
   return { id: 'market', kind: 'market', source: null, missing: false, side, twoSided: false };
