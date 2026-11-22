@@ -23,6 +23,22 @@ export const INSTALL_STEPS = Object.freeze({
 });
 
 /**
+ * Whether to offer "Install" in this tab.
+ * - Inside the installed app: never.
+ * - The browser offers installation right now: yes — it does that only while
+ *   the app is not on the device (it may have been removed since).
+ * - The app was installed on this device before: no, in the browser too.
+ */
+export function showInstallButton({ standalone = false, offered = false, remembered = false } = {}) {
+  if (standalone) return false;
+  if (offered) return true;
+  return !remembered;
+}
+
+/** The display modes an installed app opens in (its own window, no address bar). */
+export const APP_DISPLAY_MODES = Object.freeze(['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay']);
+
+/**
  * Whether the page already runs as an installed app (its own window, no
  * browser bars) — then there is nothing to install.
  */

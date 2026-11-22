@@ -1,7 +1,7 @@
 // App chrome: theme, language, rates status line, the two view tabs, splash
 // screen, footer and installing the app to the home screen.
-import { APP_NAME, APP_VERSION, RATE_SOURCES } from '../config.js';
-import { INSTALL_STEPS, installPlatform, isInstalled } from '../core/install.js';
+import { APP_NAME, APP_VERSION, RATE_SOURCES, STORAGE_KEYS } from '../config.js';
+import { APP_DISPLAY_MODES, INSTALL_STEPS, installPlatform, isInstalled, showInstallButton } from '../core/install.js';
 import { VIEWS } from '../core/state.js';
 import { $, $$, createSheet } from './dom.js';
 
@@ -156,21 +156,51 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     }));
   }
 
-  const showInstall = visible => el.installButtons.forEach(button => { button.hidden = !visible; });
-  showInstall(!isInstalled({
-    standaloneDisplay: matchMedia('(display-mode: standalone)').matches,
+  // Whether the app is installed on this device is remembered, so that after
+  // installing, "Install" disappears from the browser tab too — not only from
+  // the installed app. The installed app and the browser share this storage.
+  const standalone = isInstalled({
+    standaloneDisplay: APP_DISPLAY_MODES.some(mode => matchMedia(`(display-mode: ${mode})`).matches),
     iosStandalone: navigator.standalone
-  }));
+  });
+  const rememberInstalled = installed => {
+    try {
+      if (installed) localStorage.setItem(STORAGE_KEYS.installed, '1');
+      else localStorage.removeItem(STORAGE_KEYS.installed);
+    } catch { /* storage blocked: the button simply follows the browser */ }
+  };
+  const rememberedInstalled = () => {
+    try { return localStorage.getItem(STORAGE_KEYS.installed) === '1'; } catch { return false; }
+  };
+  function refreshInstall() {
+    const visible = showInstallButton({
+      standalone, offered: Boolean(window.cartrateInstallPrompt), remembered: rememberedInstalled()
+    });
+    el.installButtons.forEach(button => { button.hidden = !visible; });
+  }
+  const installed = () => {
+    rememberInstalled(true);
+    refreshInstall();
+  };
+
+  if (standalone) rememberInstalled(true);
+  // The browser offers installation only while the app is not on the device
+  if (window.cartrateInstallPrompt) rememberInstalled(false);
+  window.addEventListener(INSTALLABLE_EVENT, () => {
+    rememberInstalled(false);
+    refreshInstall();
+  });
+  refreshInstall();
 
   // Chrome on Android also knows when this app is already on the home screen
   // (manifest "related_applications"): then there is nothing to install.
   navigator.getInstalledRelatedApps?.()
-    .then(apps => { if (apps.length) showInstall(false); })
+    .then(apps => { if (apps.length) installed(); })
     .catch(() => {});
 
   window.addEventListener('appinstalled', () => {
     window.cartrateInstallPrompt = null;
-    showInstall(false);
+    installed();
     installGuide.close();
   });
   el.installButtons.forEach(button => button.addEventListener('click', async () => {
@@ -190,7 +220,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
         return;
       }
       const choice = await offer.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') showInstall(false);
+      if (choice?.outcome === 'accepted') installed();
     } finally {
       installing = false;
     }

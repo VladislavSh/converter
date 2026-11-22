@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { INSTALL_STEPS, installPlatform, isInstalled } from '../js/core/install.js';
+import { APP_DISPLAY_MODES, INSTALL_STEPS, installPlatform, isInstalled, showInstallButton } from '../js/core/install.js';
 import { MESSAGES } from '../js/i18n.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -94,4 +94,14 @@ test('the manifest lets Chrome install the app and spot an installed copy', () =
   assert.match(self.url, /^https:\/\/[^/]+\/converter\/manifest\.webmanifest$/);
   assert.equal(manifest.display, 'standalone');
   assert.ok(manifest.name && manifest.short_name && manifest.start_url);
+});
+
+test('"Install" disappears once the app is installed, in the browser tab too', () => {
+  assert.equal(showInstallButton(), true, 'a browser tab, nothing known: offer it');
+  assert.equal(showInstallButton({ standalone: true }), false, 'inside the installed app');
+  assert.equal(showInstallButton({ standalone: true, offered: true }), false);
+  assert.equal(showInstallButton({ remembered: true }), false, 'installed on this device before: not in the browser either');
+  assert.equal(showInstallButton({ remembered: true, offered: true }), true, 'the browser offers it again: the app was removed');
+  assert.equal(showInstallButton({ offered: true }), true);
+  assert.ok(APP_DISPLAY_MODES.includes('standalone') && APP_DISPLAY_MODES.includes('fullscreen'));
 });
