@@ -1,6 +1,6 @@
 // Offline support. Only same-origin files are cached; the rate APIs always go
 // to the network (the app keeps the last rates itself). No third-party hosts.
-const VERSION = 'flux-v9';
+const VERSION = 'flux-1.5.0'; // keep in sync with APP_VERSION in js/app.js
 const SHELL = [
   './',
   'index.html',
@@ -16,7 +16,12 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // fetch the shell fresh (not from the HTTP cache) so a new version never installs stale files
+  e.waitUntil(
+    caches.open(VERSION)
+      .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -49,10 +54,12 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // App shell: network first so updates arrive quickly, cache when offline
+  // App shell: network first so updates arrive quickly, cache when offline.
+  // cache: 'no-cache' revalidates with the server instead of trusting the
+  // browser's HTTP cache (GitHub Pages lets it keep files for 10 minutes).
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then(res => putOk(VERSION, req, res))
-      .catch(() => caches.match(req).then(r => r || caches.match('index.html')))
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('index.html')))
   );
 });

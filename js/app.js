@@ -1,6 +1,9 @@
 (() => {
   'use strict';
 
+  // Bump together with VERSION in sw.js on every release
+  const APP_VERSION = '1.5.0';
+
   /* ================= i18n ================= */
   const I18N = {
     ru: {
@@ -11,6 +14,7 @@
       error: 'Не удалось загрузить курсы', noRates: 'Нет данных о курсах', copied: 'Скопировано',
       popular: 'Популярные', otherFiat: 'Другие валюты', nothing: 'Ничего не найдено',
       empty: 'Список пуст — добавьте валюту', refreshed: 'Курсы обновлены', source: 'Источники',
+      version: 'версия', updatedTo: 'Приложение обновлено до версии',
       removed: 'удалена', added: 'добавлена', copy: 'Копировать', remove: 'Удалить', drag: 'Перетащить',
       vConvert: 'Конвертер', vShop: 'Покупка',
       shPrice: 'Цена товара', shShip: 'Доставка', shSvc: 'Процент',
@@ -48,6 +52,7 @@
       error: 'Failed to load rates', noRates: 'No rate data', copied: 'Copied',
       popular: 'Popular', otherFiat: 'Other currencies', nothing: 'Nothing found',
       empty: 'The list is empty — add a currency', refreshed: 'Rates updated', source: 'Sources',
+      version: 'version', updatedTo: 'App updated to version',
       removed: 'removed', added: 'added', copy: 'Copy', remove: 'Remove', drag: 'Drag',
       vConvert: 'Converter', vShop: 'Purchase',
       shPrice: 'Item price', shShip: 'Shipping', shSvc: 'Percent',
@@ -588,7 +593,7 @@
     document.querySelectorAll('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
     document.querySelectorAll('[data-i18n-ph]').forEach(n => { n.placeholder = t(n.dataset.i18nPh); });
     el.splashText.textContent = t('loading');
-    el.source.textContent = `${t('source')}: exchangerate.fun · open.er-api.com · CoinGecko`;
+    el.source.textContent = `${t('source')}: exchangerate.fun · open.er-api.com · CoinGecko · ${t('version')} ${APP_VERSION}`;
   }
 
   function applyTheme() {
@@ -977,8 +982,26 @@
     deferredPrompt = null;
     el.install.hidden = true;
   });
+  // Service worker + auto-update: an installed app on a phone is often resumed
+  // from memory instead of reloaded, so we check for a new version whenever it
+  // comes back to the foreground and reload once the new worker takes over.
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return; // first install: nothing old to replace
+      reloading = true;
+      try { sessionStorage.setItem('flux_updated', '1'); } catch (_) {}
+      location.reload();
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+        const check = () => { if (!document.hidden) reg.update().catch(() => {}); };
+        document.addEventListener('visibilitychange', check);
+        window.addEventListener('focus', check);
+        setInterval(check, 30 * 60e3);
+      }).catch(() => {});
+    });
   }
 
   /* ================= Boot ================= */
@@ -988,6 +1011,12 @@
   applyI18n();
   setView(state.view);
   setStatus(rates ? (navigator.onLine ? 'ok' : 'offline') : 'loading');
+  try {
+    if (sessionStorage.getItem('flux_updated')) {
+      sessionStorage.removeItem('flux_updated');
+      setTimeout(() => toast(`${t('updatedTo')} ${APP_VERSION}`), 1800);
+    }
+  } catch (_) {}
 
   const started = performance.now();
   let splashDone = false;
