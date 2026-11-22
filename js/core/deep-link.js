@@ -1,10 +1,8 @@
 // Links to a calculation. The whole state of the open tab fits in the query:
 //   ?mode=converter&amount=100&from=USD&list=USD,CNY,UZS,RUB
 //   ?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off
-// With a rate source other than the market, both get &src=cbu (or Kapitalbank
-// with its rates: &src=kapital&kr=USD:11950:12050&kd=22.11.2026, or a source of
-// one's own: &src=own&srcname=…&srcq=UZS&srcr=USD:12950,CNY:1800). A converter
-// counted by the banks' sell prices adds &side=sell (buy is the default).
+// With a bank from bank.uz as the rate source both get &src=kapitalApi (or
+// &src=nbuApi); the market rates add nothing.
 // Everything in a link is untrusted: each parameter is validated on its own
 // and a bad one is simply ignored.
 import { adoptLinkedSource, sourceParams } from './rate-sources.js';

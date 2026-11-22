@@ -347,7 +347,7 @@ h1, h2, p { margin: 0; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .field select option { color: var(--text); background-color: var(--sheet); }
-.field__row select, .field .src-row select { padding-left: 12px; padding-right: 28px; background-position: right 8px center; background-size: 14px; }
+.field__row select { padding-left: 12px; padding-right: 28px; background-position: right 8px center; background-size: 14px; }
 .field__row { display: flex; gap: 8px; }
 .field__row input { flex: 1; min-width: 0; }
 .field__row select { width: 100px; flex: none; }
@@ -538,20 +538,7 @@ body[data-view="banks"] .rate-bar { display: none; }
 .rate-item__act { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--text-2); }
 .rate-item__act:hover { color: var(--text); background: var(--card-hover); }
 .rate-item__act svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.rate-add { width: 100%; justify-content: center; }
 
-/* A source of one's own: rows of "1 USD = 12 950 UZS" */
-.src-quote { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.src-quote label { margin: 0 0 0 2px; }
-.src-quote select { width: 96px; flex: none; }
-.src-rows { display: grid; gap: 8px; }
-/* Kapitalbank: currency, buy, sell */
-.src-row.src-row--pair { display: grid; grid-template-columns: 82px minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 6px; }
-.field .src-row--pair select { width: 100%; }
-.src-row--head { margin-bottom: 6px; padding: 0 2px; font-size: 11.5px; font-weight: 700; color: var(--text-3); }
-.kapital-hint { margin-bottom: 14px; }
-.kapital-hint .guide__lead { margin-bottom: 6px; }
-.kapital-hint .link-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* Converter: a bank with buy and sell prices — both sums in every row */
 .res--two .res__main { align-items: flex-start; padding: 14px 0 12px; }
 .res--two .badge { margin-top: 2px; }
@@ -596,25 +583,8 @@ body[data-view="banks"] .rate-bar { display: none; }
   .res__side b[data-size="m"] { font-size: 15.5px; }
   .res__side b[data-size="s"] { font-size: 14px; }
 }
-.src-row { display: flex; align-items: center; gap: 6px; }
-.src-row__sign { flex: none; font-weight: 800; font-size: 15px; color: var(--text-2); }
-.field .src-row select { width: 82px; flex: none; }
-.src-row input { flex: 1; min-width: 0; }
-.src-row__quote { flex: none; min-width: 32px; font-size: 13px; font-weight: 700; color: var(--text-2); }
-.src-row__remove { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--text-3); }
-.src-row__remove:hover { color: var(--text); background: var(--input-bg); }
-.src-row__remove svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-.field .src-row.is-error input { border-color: var(--bad); }
-.src-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 8px; }
-.rate-error { margin: 8px 2px 0; font-size: 13px; font-weight: 600; color: var(--bad); }
-.rate-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
-.rate-actions .guide__ok { margin-top: 0; }
 .primary-btn { height: 48px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; transition: transform .2s var(--ease); }
 .primary-btn:active { transform: scale(.97); }
-@media (max-width: 350px) {
-  .src-row { gap: 4px; }
-  .field .src-row select { width: 72px; }
-}
 
 .sheet__grab { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .5; margin: 4px auto 6px; transition: opacity .2s, width .3s var(--spring); }
 .sheet.is-dragging .sheet__grab { opacity: .9; width: 52px; }
@@ -680,8 +650,6 @@ body[data-view="banks"] .rate-bar { display: none; }
   grid-area: chev; width: 34px; height: 34px; padding: 8px; border-radius: 11px; background: var(--card-hover);
   fill: none; stroke: var(--text-2); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
 }
-.src-group { list-style: none; padding: 10px 6px 2px; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--text-2); }
-.src-group:first-child { padding-top: 0; }
 .rate-item__tag {
   flex: none; margin-left: auto; padding: 4px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
   color: var(--good); background: rgba(16, 185, 129, .14);
@@ -704,9 +672,6 @@ body[data-view="banks"] .rate-bar { display: none; }
 .bank-row__name small { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bank-row__value { display: grid; justify-items: end; text-align: right; font-variant-numeric: tabular-nums; }
 .bank-row__value b { font-size: 14.5px; font-weight: 700; white-space: nowrap; }
-.bank-row__value small { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.bank-row__value .is-up { color: var(--good); }
-.bank-row__value .is-down { color: var(--bad); }
 .bank__use {
   display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 2px 2px; height: 34px; padding: 0 14px;
   border-radius: 12px; font-size: 13px; font-weight: 800; color: #fff; background: var(--accent);

@@ -1,6 +1,5 @@
-// Exchange rates of Uzbek banks for the "Banks" tab: the official rates of the
-// Central Bank (cbu.uz), the buy/sell board of the National Bank (nbu.uz) and
-// the buy/sell boards our rates server takes from bank.uz.
+// Exchange rates of Uzbek banks for the "Banks" tab: the buy/sell boards of the
+// National Bank and Kapitalbank that our rates server takes from bank.uz.
 // Everything from the network or from storage passes through these functions.
 // Pure — no DOM, no network.
 import { BANK_SOURCES } from './rate-sources.js';
@@ -30,32 +29,12 @@ export function bankDate(value) {
 const pick = (item, names) => names.map(name => item?.[name]).find(value => value != null && value !== '');
 
 /**
- * The Central Bank's JSON: [{Ccy: "USD", Rate: "12004.48", Nominal: "1", Diff: "32.84", Date: "21.11.2026"}, …].
- * `rate` is in sums for `nominal` units (some currencies are quoted per 10 or 100).
- * @returns {{date: string, rates: {code: string, nominal: number, rate: number, diff: number}[]}|null}
- */
-export function parseCbu(payload) {
-  if (!Array.isArray(payload)) return null;
-  const rates = [];
-  let date = '';
-  for (const item of payload.slice(0, MAX_RATES)) {
-    const code = item?.Ccy;
-    const rate = bankNumber(item?.Rate);
-    if (!isCurrencyCode(code) || code === 'UZS' || rate == null || rates.some(entry => entry.code === code)) continue;
-    const diff = Number(String(item.Diff ?? '').replace(',', '.'));
-    rates.push({ code, nominal: bankNumber(item.Nominal) ?? 1, rate, diff: Number.isFinite(diff) ? diff : 0 });
-    date ||= bankDate(item.Date);
-  }
-  return rates.length ? { date, rates } : null;
-}
-
-/**
- * The National Bank's board: buy and sell prices in sums. The field names are
- * read flexibly (nbu_buy_price / nbu_cell_price, buy / sell…); a currency the
- * bank does not trade today may have only one of them.
+ * A board of buy and sell prices in sums. The field names are read flexibly
+ * (buy / sell, buy_price / sell_price…); a currency the bank does not trade
+ * today may have only one of them.
  * @returns {{date: string, rates: {code: string, nominal: number, buy: number|null, sell: number|null}[]}|null}
  */
-export function parseNbu(payload) {
+function parseBoard(payload) {
   const list = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : null;
   if (!list) return null;
   const rates = [];
@@ -80,32 +59,27 @@ export function parseNbu(payload) {
  */
 export function parseRatesApi(payload) {
   if (!payload || typeof payload !== 'object' || !Array.isArray(payload.rates)) return null;
-  const board = parseNbu(payload.rates);
+  const board = parseBoard(payload.rates);
   return board ? { ...board, date: bankDate(payload.bankUpdatedAt) || bankDate(payload.updatedAt) } : null;
 }
 
 /** A cached bank board read back from storage, checked again; null when unusable. */
-function restoreBoard(raw, kind) {
+function restoreBoard(raw) {
   if (!raw || typeof raw !== 'object' || !Number.isFinite(raw.ts) || !Array.isArray(raw.rates)) return null;
   const rates = [];
   for (const entry of raw.rates.slice(0, MAX_RATES)) {
     if (!isCurrencyCode(entry?.code) || rates.some(other => other.code === entry.code)) continue;
     const nominal = bankNumber(entry.nominal) ?? 1;
-    if (kind === 'cbu') {
-      const rate = bankNumber(entry.rate);
-      if (rate != null) rates.push({ code: entry.code, nominal, rate, diff: Number.isFinite(entry.diff) ? entry.diff : 0 });
-    } else {
-      const buy = bankNumber(entry.buy);
-      const sell = bankNumber(entry.sell);
-      if (buy != null || sell != null) rates.push({ code: entry.code, nominal, buy, sell });
-    }
+    const buy = bankNumber(entry.buy);
+    const sell = bankNumber(entry.sell);
+    if (buy != null || sell != null) rates.push({ code: entry.code, nominal, buy, sell });
   }
   return rates.length ? { ts: raw.ts, date: bankDate(raw.date), rates } : null;
 }
 
-/** @returns {Record<string, object|null>} a board (or null) for every bank: {cbu, nbu, nbuApi, kapitalApi} */
+/** @returns {Record<string, object|null>} a board (or null) for every bank: {nbuApi, kapitalApi} */
 export function restoreBankCache(raw) {
-  return Object.fromEntries(BANK_SOURCES.map(bank => [bank, restoreBoard(raw?.[bank], bank)]));
+  return Object.fromEntries(BANK_SOURCES.map(bank => [bank, restoreBoard(raw?.[bank])]));
 }
 
 /**

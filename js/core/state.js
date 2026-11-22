@@ -3,7 +3,7 @@
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
 import {
-  DEFAULT_SOURCE, adoptOwnKapital, cleanKapital, cleanSources, isSourceId, mergeSameNames, sourcesFromPairs
+  DEFAULT_SOURCE, currentSourceId
 } from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
@@ -149,25 +149,15 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     input: cleanText(raw.input, '100'),
     // the amount was typed on the main screen and "Purchase" has not taken it yet
     amountFresh: raw.amountFresh === true,
-    // where the rates come from: 'market', a bank ('cbu', 'nbu', 'kapitalApi'…) or a source of the user's own
-    sources: cleanSources(raw.sources),
-    rateSource: DEFAULT_SOURCE,
-    // Kapitalbank's buy and sell prices, typed in from the bank's page
-    kapital: cleanKapital(raw.kapital),
+    // where the rates come from: 'market' (exchangerate.fun), 'nbuApi' or 'kapitalApi' (bank.uz).
+    // A bank of an earlier version becomes the same bank from bank.uz; the Central
+    // Bank and the sources of one's own are gone: the default source instead.
+    rateSource: currentSourceId(raw.rateSource),
     shop: cleanShop(raw.shop)
   };
-  if (isSourceId(state, raw.rateSource)) state.rateSource = raw.rateSource;
-  Object.assign(state, mergeSameNames(state.sources, state.rateSource));
-  adoptOwnKapital(state); // v12: a "Капиталбанк" source of one's own becomes the built-in one
 
   const fromVersion = src ? (Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1) : STATE_VERSION;
   if (src) migrate(state, fromVersion);
-  // v11: single custom rates became sources that hold several currencies
-  if (fromVersion < 11 && Array.isArray(raw.customRates)) {
-    const converted = sourcesFromPairs(raw.customRates, raw.rateId);
-    Object.assign(state, mergeSameNames(converted.sources, converted.rateSource));
-    adoptOwnKapital(state);
-  }
   if (!state.list.length) state.list = [...DEFAULT_LIST];
   if (!state.list.includes(state.base)) {
     // The typed amount belonged to a currency that is gone: "50 EUR" must not

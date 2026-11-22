@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { RATE_SOURCES } from '../js/config.js';
 import { parseRatesApi, restoreBankCache } from '../js/core/bank-rates.js';
 import {
-  BANK_SOURCES, BUILTIN_SOURCES, KAPITAL, KAPITAL_API, NBU_API, adoptLinkedSource, isTwoSided,
+  BANK_SOURCES, BUILTIN_SOURCES, KAPITAL_API, NBU_API, adoptLinkedSource, isTwoSided,
   resolveSource, selectSource, sourceParams, sourceTable
 } from '../js/core/rate-sources.js';
 import { convert } from '../js/core/rates.js';
@@ -48,9 +48,9 @@ test('a server board with stale rates is still shown; junk is not', () => {
   assert.equal(parseRatesApi({ title: 'Too Many Requests', status: 429 }), null);
 });
 
-test('the server sources are built in, two-sided and loaded with the other banks', () => {
+test('the server sources are built in, two-sided and loaded together', () => {
   assert.ok(BANK_SOURCES.includes(NBU_API) && BANK_SOURCES.includes(KAPITAL_API));
-  assert.deepEqual(BUILTIN_SOURCES, ['cbu', 'nbu', NBU_API, KAPITAL, KAPITAL_API], 'each bank\'s two side by side');
+  assert.deepEqual(BUILTIN_SOURCES, [NBU_API, KAPITAL_API], 'the only banks');
   assert.ok(isTwoSided(NBU_API) && isTwoSided(KAPITAL_API));
   for (const id of [NBU_API, KAPITAL_API]) {
     assert.ok(RATE_SOURCES[id].url.startsWith('https://'), `${id}: HTTPS only, or the browser blocks it`);
@@ -59,7 +59,7 @@ test('the server sources are built in, two-sided and loaded with the other banks
   assert.equal(new URL(RATE_SOURCES.nbuApi.url).host, new URL(RATE_SOURCES.kapitalApi.url).host, 'one server');
 });
 
-test('calculations by a server source: buy by default, sell when chosen', () => {
+test('calculations by a server source: sell by default, buy when asked', () => {
   const MARKET = { USD: 1, EUR: 0.9, RUB: 80, UZS: 12000 };
   const banks = { kapitalApi: { ...parseRatesApi(KAPITAL_ANSWER), ts: 1 } };
   const state = buildState(null);

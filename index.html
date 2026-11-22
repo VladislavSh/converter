@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Only our own files + the three public rate APIs; no third-party scripts, fonts or images -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://212-47-58-193.sslip.io https://api.exchangerate.fun https://open.er-api.com https://api.coingecko.com https://cbu.uz https://nbu.uz; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://212-47-58-193.sslip.io https://api.exchangerate.fun https://open.er-api.com https://api.coingecko.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>CartRate — конвертер валют</title>
   <meta name="description" content="Конвертер валют и расчёт покупок: комиссии, доставка и сумма пополнения карты">
@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.26.0"></script>
-  <script src="js/boot-guard.js?v=1.26.0"></script>
-  <script src="js/install-early.js?v=1.26.0"></script>
+  <script src="js/theme-init.js?v=1.27.0"></script>
+  <script src="js/boot-guard.js?v=1.27.0"></script>
+  <script src="js/install-early.js?v=1.27.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.26.0">
+  <link rel="stylesheet" href="css/style.css?v=1.27.0">
 </head>
 <body>
 
@@ -336,7 +336,6 @@
         <div class="src-head">
           <p class="bank__sub" id="src-sub"></p>
           <a class="link-btn" id="src-link" target="_blank" rel="noopener noreferrer" data-i18n="bankSite" hidden>Сайт банка</a>
-          <button type="button" class="link-btn" id="src-edit" data-i18n="srcEdit" hidden>Изменить</button>
         </div>
         <div id="src-use"></div>
         <ul class="bank__rates" id="src-rates"></ul>
@@ -345,10 +344,6 @@
         <button type="button" class="ghost-btn" id="bank-more">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           <span data-i18n="bankLess">Свернуть</span>
-        </button>
-        <button type="button" class="ghost-btn" id="src-add">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          <span data-i18n="rateAdd">Добавить свой источник</span>
         </button>
       </div>
       <p class="hint" data-i18n="bankHint">Выберите источник и нажмите «Считать по этим курсам».</p>
@@ -405,7 +400,7 @@
   </div>
 </div>
 
-<!-- The market rates or one of the user's own; adding and changing them -->
+<!-- The market rates or a bank from bank.uz -->
 <div class="sheet" id="rate-sheet" aria-hidden="true">
   <div class="sheet__backdrop" data-close></div>
   <div class="sheet__panel sheet__panel--fit" role="dialog" aria-modal="true" aria-labelledby="rate-title">
@@ -419,49 +414,8 @@
     <div id="rate-pick">
       <p class="guide__lead" data-i18n="rateLead">Все расчёты идут по курсам выбранного источника.</p>
       <ul class="rate-list" id="rate-list" role="radiogroup" aria-labelledby="rate-title"></ul>
-      <button type="button" class="ghost-btn rate-add" id="rate-add">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        <span data-i18n="rateAdd">Добавить свой источник</span>
-      </button>
+      <p class="card__note" data-i18n="srcMissingHint">Валюты, которых нет у банка (например, юань у Капиталбанка), считаются по рыночному курсу.</p>
     </div>
-    <form id="rate-form" novalidate hidden>
-      <!-- Kapitalbank: its rates are typed in from the bank's page -->
-      <div class="kapital-hint" id="kapital-hint" hidden>
-        <p class="guide__lead" data-i18n="kapitalHint">Сайт банка не отдаёт курсы другим сайтам — перепишите их со страницы банка.</p>
-        <a class="link-btn" id="kapital-site" target="_blank" rel="noopener noreferrer">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
-          <span data-i18n="kapitalOpenSite">Открыть курсы на сайте банка</span>
-        </a>
-      </div>
-      <div class="field" id="rate-name-field">
-        <label for="rate-name" data-i18n="rateName">Название</label>
-        <input id="rate-name" type="text" maxlength="30" autocomplete="off" enterkeyhint="next" data-i18n-ph="rateNamePh" placeholder="Например, Капиталбанк">
-      </div>
-      <div class="field field--gap src-quote" id="rate-quote-field">
-        <label for="rate-quote" data-i18n="srcQuote">Курсы указаны в</label>
-        <select id="rate-quote"></select>
-      </div>
-      <div class="field field--gap">
-        <span class="field__label" data-i18n="srcRates">Курсы валют</span>
-        <div class="src-row src-row--pair src-row--head" id="rate-pair-head" aria-hidden="true" hidden>
-          <span data-i18n="srcCurrency">Валюта</span><span data-i18n="sideBuy">Покупка</span><span data-i18n="sideSell">Продажа</span><span></span>
-        </div>
-        <div class="src-rows" id="rate-rows"></div>
-        <div class="src-tools">
-          <button type="button" class="link-btn" id="rate-add-row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-            <span data-i18n="srcAddRow">Добавить валюту</span>
-          </button>
-          <button type="button" class="link-btn" id="rate-fill" data-i18n="srcFill">Подставить рыночные</button>
-        </div>
-      </div>
-      <p class="card__note" data-i18n="srcHint">Пустые поля не сохраняются. Валюты, которых нет в источнике, считаются по рынку.</p>
-      <p class="rate-error" id="rate-error" role="alert" hidden></p>
-      <div class="rate-actions">
-        <button type="button" class="guide__ok" id="rate-cancel" data-i18n="rateCancel">Отмена</button>
-        <button type="submit" class="primary-btn" data-i18n="rateSave">Сохранить</button>
-      </div>
-    </form>
   </div>
 </div>
 
@@ -536,6 +490,6 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.26.0"></script>
+<script type="module" src="js/main.js?v=1.27.0"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@ import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
 import {
-  BANK_SOURCES, DEFAULT_SIDE, KAPITAL, KAPITAL_API, NBU_API, resolveSource, sourceSummary, sourceTable
+  BANK_SOURCES, DEFAULT_SIDE, KAPITAL_API, NBU_API, resolveSource, sourceTable
 } from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState, restoreDroppedSum, startOrderInYuan, startWithoutDelivery } from './core/state.js';
@@ -27,9 +27,8 @@ import { createPurchaseView } from './ui/purchase.js';
 import { createRatesView } from './ui/rates.js';
 import { createShell } from './ui/shell.js';
 
-// What the built-in sources are called, and the line under a loaded board's name
-const SOURCE_NAMES = { cbu: 'bankCbu', nbu: 'bankNbu', [NBU_API]: 'bankNbuApi', [KAPITAL]: 'bankKapital', [KAPITAL_API]: 'bankKapitalApi' };
-const BOARD_NOTES = { cbu: 'srcCbuNote', nbu: 'srcNbuNote', [NBU_API]: 'srcApiNote', [KAPITAL_API]: 'srcApiNote' };
+// What the built-in sources are called
+const SOURCE_NAMES = { [NBU_API]: 'bankNbuApi', [KAPITAL_API]: 'bankKapitalApi' };
 
 try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
 
@@ -68,7 +67,7 @@ const t = (key, vars) => translate(state.lang, key, vars);
 const app = {
   state,
   get rates() { return snapshot; },
-  /** The bank boards as loaded: {cbu, nbu, nbuApi, kapitalApi}, each null until it arrives. */
+  /** The bank boards as loaded: {nbuApi, kapitalApi}, each null until it arrives. */
   get banks() { return banks; },
   get bankStatus() { return bankStatus; },
   t,
@@ -85,40 +84,26 @@ const app = {
   /** What a source is called: the market one by the service it comes from. */
   sourceName: id => {
     if (id === 'market') return snapshot?.source || RATE_SOURCES.fiatPrimary.name;
-    if (Object.hasOwn(SOURCE_NAMES, id)) return t(SOURCE_NAMES[id]);
-    return state.sources.find(source => source.id === id)?.name ?? '';
+    return Object.hasOwn(SOURCE_NAMES, id) ? t(SOURCE_NAMES[id]) : '';
   },
-  /** One line under a source's name in the lists: how fresh it is, or what is in it. */
+  /** One line under a source's name in the lists: how fresh it is. */
   sourceNote: id => {
     if (id === 'market') return t('rateMarketNote');
-    if (id === KAPITAL) {
-      const { rates, date } = state.kapital;
-      if (!rates.length) return t('srcKapitalEmpty');
-      return date ? t('srcKapitalNote', { date }) : t('srcKapitalNoDate');
-    }
-    if (BANK_SOURCES.includes(id)) {
-      const board = banks[id];
-      if (!board) return t(bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
-      return t(BOARD_NOTES[id], { date: board.date });
-    }
-    const own = state.sources.find(source => source.id === id);
-    return own ? sourceSummary(own, localeOf(state.lang), 3) : '';
+    const board = banks[id];
+    if (!board) return t(bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
+    return t('srcApiNote', { date: board.date });
   },
   /**
    * One line for a shared calculation, when its numbers are not the market ones.
-   * @param {'buy'|'sell'} [side]  which prices of a bank with two of them were used
+   * @param {'buy'|'sell'} [side]  which prices of the bank were used
    */
   rateNote: (side = DEFAULT_SIDE) => {
-    const { kind, id, source, missing, twoSided } = resolveSource(state, banks, side);
+    const { kind, id, source, missing } = resolveSource(state, banks, side);
     if (kind === 'market' || missing) return null;
-    if (kind === 'bank') {
-      // "Курсы: Капиталбанк, покупка, на 22.11.2026 (1 USD = 11 950 UZS · …)"
-      const sideWord = t(side === 'sell' ? 'sideSell' : 'sideBuy').toLocaleLowerCase(localeOf(state.lang));
-      const name = twoSided ? `${app.sourceName(id)}, ${sideWord},` : app.sourceName(id);
-      const line = source.date ? t('shareSourceBank', { name, date: source.date }) : t('shareSourceNoDate', { name: name.replace(/,$/, '') });
-      return id === KAPITAL ? `${line} (${sourceSummary(source, localeOf(state.lang), 3)})` : line;
-    }
-    return t('shareSourceOwn', { name: source.name, rates: sourceSummary(source, localeOf(state.lang), 3) });
+    // "Курсы: Капиталбанк · bank.uz, продажа, на 22.11.2026"
+    const sideWord = t(side === 'sell' ? 'sideSell' : 'sideBuy').toLocaleLowerCase(localeOf(state.lang));
+    const name = `${app.sourceName(id)}, ${sideWord}`;
+    return source.date ? t('shareSourceBank', { name: `${name},`, date: source.date }) : t('shareSourceNoDate', { name });
   },
   save: () => {
     writeJson(STORAGE_KEYS.state, state);
@@ -153,11 +138,7 @@ const picker = createPickerView(app, { onListChange: () => converter.render() })
 const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
 const purchase = createPurchaseView(app, { keypad });
 const rateSources = createRatesView(app, { onChange: renderAll });
-const bankView = createBanksView(app, {
-  onSourceChange: renderAll,
-  onAddSource: () => rateSources.add(),
-  onEditSource: id => rateSources.edit(id)
-});
+const bankView = createBanksView(app, { onSourceChange: renderAll });
 
 // An amount just copied elsewhere is offered on return; it goes where the user is
 const clipHint = createClipboardHint(app, {
@@ -183,8 +164,7 @@ function renderAll() {
 
 /**
  * Loads one bank's board. Each bank is shown as soon as it answers; one that
- * is slow or unreachable (the National Bank answers only inside Uzbekistan)
- * never holds the others back. A bank that does not answer keeps its last board.
+ * is slow or unreachable never holds the others back. A bank that does not answer keeps its last board.
  */
 async function refreshBank(bank, force) {
   const board = banks[bank];
