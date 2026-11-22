@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.13.1"></script>
-  <script src="js/boot-guard.js?v=1.13.1"></script>
-  <script src="js/install-early.js?v=1.13.1"></script>
+  <script src="js/theme-init.js?v=1.14.0"></script>
+  <script src="js/boot-guard.js?v=1.14.0"></script>
+  <script src="js/install-early.js?v=1.14.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.13.1">
+  <link rel="stylesheet" href="css/style.css?v=1.14.0">
 </head>
 <body>
 
@@ -148,6 +148,14 @@
 
       <div class="card">
         <h2 class="card__title" data-i18n="shFeeTitle">Комиссия за оплату иностранной картой</h2>
+        <div class="fee-explain fee-explain--top" id="sh-fee-explain"></div>
+        <details class="fold" id="sh-fee-fold">
+          <summary class="fold__head">
+            <span class="fold__title" data-i18n="feeTune">Настроить</span>
+            <span class="fold__value" id="sh-fee-summary"></span>
+            <svg class="fold__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="fold__body">
         <div class="presets" id="sh-presets">
           <button type="button" data-p="3,0,2" data-i18n="prCard">Карта в Pinduoduo: 3%, мин. 2 ¥</button>
           <button type="button" data-p="3,200,0" data-i18n="pr200">WeChat / Alipay: 3% от 200 ¥</button>
@@ -168,7 +176,6 @@
             <input id="sh-min" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
           </div>
         </div>
-        <div class="fee-explain" id="sh-fee-explain"></div>
         <div class="grid2">
           <div class="field">
             <label for="sh-bank" data-i18n="shBank">Комиссия банка, %</label>
@@ -179,6 +186,8 @@
             <input id="sh-buf" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
           </div>
         </div>
+          </div>
+        </details>
       </div>
 
       <div class="card">
@@ -245,7 +254,13 @@
             </div>
             <p class="card__note" id="dl-big-note"></p>
           </div>
-          <div class="grid3">
+          <details class="fold" id="dl-rates-fold">
+            <summary class="fold__head">
+              <span class="fold__title" data-i18n="dlRates">Тарифы и округление</span>
+              <span class="fold__value" id="dl-rates-summary"></span>
+              <svg class="fold__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </summary>
+          <div class="grid3 fold__body">
             <div class="field">
               <label for="dl-air" data-i18n="dlAirRate">Авиа, $/кг</label>
               <input id="dl-air" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
@@ -264,6 +279,7 @@
               </select>
             </div>
           </div>
+          </details>
           <div class="result__rows dl-res" id="dl-break"></div>
         </div>
       </div>
@@ -292,6 +308,11 @@
         </button>
       </div>
 
+      <button type="button" class="sum-bar" id="sh-sumbar" hidden data-i18n-aria="sumBarAria" aria-label="Показать расчёт">
+        <span class="sum-bar__main"><small id="sh-sumbar-label">Пополнить карту</small><b id="sh-sumbar-value">—</b></span>
+        <span class="sum-bar__side" id="sh-sumbar-side"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
       <p class="hint" data-i18n="shHint">Комиссия считается с каждой оплаты отдельно. Пополнение округлено вверх с запасом: курс Visa и банка может отличаться от рыночного.</p>
     </section>
 
@@ -474,6 +495,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.13.1"></script>
+<script type="module" src="js/main.js?v=1.14.0"></script>
 </body>
 </html>

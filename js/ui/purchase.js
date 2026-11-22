@@ -49,7 +49,14 @@ export function createPurchaseView(app, { keypad }) {
     alt: $('#sh-alt'),
     rates: $('#sh-rates'),
     tip: $('#sh-tip'),
-    summary: $('#sh-grand')
+    summary: $('#sh-grand'),
+    feeSummary: $('#sh-fee-summary'),
+    dlRatesSummary: $('#dl-rates-summary'),
+    resultCard: $('#view-shop .result'),
+    sumBar: $('#sh-sumbar'),
+    sumBarLabel: $('#sh-sumbar-label'),
+    sumBarValue: $('#sh-sumbar-value'),
+    sumBarSide: $('#sh-sumbar-side')
   };
   const shop = () => app.state.shop;
 
@@ -85,6 +92,14 @@ export function createPurchaseView(app, { keypad }) {
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', String(active));
     }
+    // The folded fee settings say in one line what they are set to
+    const preset = $$('button[data-p]', el.presets).find(button => button.dataset.p === rule);
+    const percent = value => formatNumber(parseNumber(value), app.locale(), 2);
+    el.feeSummary.textContent = [
+      preset ? preset.textContent : app.t('feeCustomRule'),
+      ...(parseNumber(s.bankPct) > 0 ? [app.t('feeSumBank', { p: percent(s.bankPct) })] : []),
+      app.t('feeSumBuffer', { p: percent(s.bufPct) })
+    ].join(' · ');
     el.dlOn.checked = s.dlOn;
     el.dlBig.checked = s.dlBig;
     el.dlBigBody.hidden = !s.dlBig;
@@ -102,6 +117,11 @@ export function createPurchaseView(app, { keypad }) {
     const locale = app.locale();
     el.dlAirLabel.textContent = t('dlPerKg', { v: money(delivery.airRate, 'USD') });
     el.dlAutoLabel.textContent = t('dlPerKg', { v: money(delivery.autoRate, 'USD') });
+    el.dlRatesSummary.textContent = t('dlRatesSum', {
+      air: el.dlAirLabel.textContent,
+      auto: el.dlAutoLabel.textContent,
+      step: el.dlStep.selectedOptions[0]?.textContent ?? ''
+    });
     if (!(delivery.kg > 0)) {
       el.dlRows.innerHTML = '';
       return;
@@ -230,6 +250,46 @@ export function createPurchaseView(app, { keypad }) {
     el.summary.hidden = !html;
   }
 
+  // ---------- the total, kept in reach at the bottom of the screen ----------
+  // While the result card is off screen (the form is being filled in above
+  // it), a bar shows the top-up and the total; a tap scrolls to the details.
+  let resultInView = true;
+  let sumBarWanted = false;
+
+  function updateSumBar() {
+    const visible = sumBarWanted && !resultInView;
+    el.sumBar.hidden = !visible;
+    document.body.classList.toggle('has-sumbar', visible);
+  }
+
+  function renderSumBar(r, money) {
+    const { t } = app;
+    sumBarWanted = r.hasTopup || r.delivery.cost > 0;
+    if (r.hasTopup) {
+      el.sumBarLabel.textContent = t('shTopup');
+      el.sumBarValue.textContent = `${money(r.topup, r.card)} ${r.card}`;
+      el.sumBarSide.textContent = r.summary?.showParts
+        ? t('sumBarTotal', { v: `${money(r.summary.needUsd, 'USD')} USD` })
+        : (r.topupAlt == null ? '' : `≈ ${money(r.topupAlt, r.altCurrency)} ${r.altCurrency}`);
+    } else if (r.summary) {
+      el.sumBarLabel.textContent = t('sumTotal');
+      el.sumBarValue.textContent = `${money(r.summary.needUsd, 'USD')} USD`;
+      el.sumBarSide.textContent = r.summary.needUzs == null ? '' : `≈ ${money(r.summary.needUzs, 'UZS')} UZS`;
+    }
+    updateSumBar();
+  }
+
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([entry]) => {
+      resultInView = entry.isIntersecting;
+      updateSumBar();
+    }, { threshold: 0.2 }).observe(el.resultCard);
+  }
+  el.sumBar.addEventListener('click', () => {
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.resultCard.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+  });
+
   let lastResult = null;
 
   function render() {
@@ -243,6 +303,7 @@ export function createPurchaseView(app, { keypad }) {
     renderBreakdown(result, money);
     renderTip(result, money);
     renderSummary(result, money);
+    renderSumBar(result, money);
   }
 
   // ---------- events ----------
