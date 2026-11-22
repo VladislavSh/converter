@@ -473,8 +473,12 @@ h1, h2, p { margin: 0; }
 .chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Sheet ---------- */
-.sheet { position: fixed; inset: 0; z-index: 50; visibility: hidden; }
-.sheet.is-open { visibility: visible; }
+/* Stays visible while it slides away, then hides */
+.sheet { position: fixed; inset: 0; z-index: 50; visibility: hidden; transition: visibility 0s linear .5s; }
+.sheet:not(.is-open) { pointer-events: none; }
+.sheet.is-open { visibility: visible; transition-delay: 0s; }
+/* Dragged by a finger: the panel follows it exactly */
+.sheet.is-dragging .sheet__panel, .sheet.is-dragging .sheet__backdrop { transition: none; }
 .sheet__backdrop { position: absolute; inset: 0; background: rgba(5, 5, 15, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .35s var(--ease); }
 .sheet.is-open .sheet__backdrop { opacity: 1; }
 .sheet__panel {
@@ -561,7 +565,8 @@ body[data-view="banks"] .rate-bar { display: none; }
   .field .src-row select { width: 72px; }
 }
 
-.sheet__grab { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .5; margin: 4px auto 6px; }
+.sheet__grab { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .5; margin: 4px auto 6px; transition: opacity .2s, width .3s var(--spring); }
+.sheet.is-dragging .sheet__grab { opacity: .9; width: 52px; }
 .sheet__head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
 .sheet__head h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
 
@@ -860,6 +865,26 @@ body.has-keypad .toast { bottom: calc(var(--keypad-h, 380px) + 12px); }
 }
 .splash__bar i { display: block; height: 100%; width: 45%; border-radius: inherit; background: var(--accent); animation: bar 1.25s cubic-bezier(.65, 0, .35, 1) infinite; }
 @keyframes bar { 0% { transform: translateX(-110%); } 100% { transform: translateX(235%); } }
+
+/* ---------- Pull to refresh ---------- */
+.ptr {
+  position: fixed; left: 50%; top: env(safe-area-inset-top, 0px); z-index: 40;
+  width: 42px; height: 42px; margin-left: -21px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: none;
+  background: var(--sheet); border: 1px solid var(--card-border); color: var(--text-2);
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .55);
+  opacity: var(--progress, 0);
+  transform: translateY(calc(var(--pull, 0px) - 52px)) scale(calc(.6 + .4 * var(--progress, 0)));
+  transition: transform .45s var(--spring), opacity .3s var(--ease), color .2s;
+}
+.ptr.is-pulling { transition: color .2s; }
+.ptr svg {
+  width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; transform: rotate(calc(var(--progress, 0) * 300deg));
+}
+.ptr.is-armed, .ptr.is-refreshing { color: var(--accent-1); }
+.ptr.is-armed svg { transform: rotate(300deg) scale(1.08); transition: transform .3s var(--pop); }
+.ptr.is-refreshing svg { animation: spin .8s linear infinite; }
 
 /* ---------- Scroll-linked motion (browsers that tie animations to scrolling) ---------- */
 @supports (animation-timeline: scroll()) {

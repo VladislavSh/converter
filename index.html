@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.22.0"></script>
-  <script src="js/boot-guard.js?v=1.22.0"></script>
-  <script src="js/install-early.js?v=1.22.0"></script>
+  <script src="js/theme-init.js?v=1.23.0"></script>
+  <script src="js/boot-guard.js?v=1.23.0"></script>
+  <script src="js/install-early.js?v=1.23.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.22.0">
+  <link rel="stylesheet" href="css/style.css?v=1.23.0">
 </head>
 <body>
 
@@ -520,8 +520,12 @@
   </div>
 </div>
 
+<!-- Pull the page down from its top to refresh the rates (ui/pull-refresh.js) -->
+<div class="ptr" id="ptr" aria-hidden="true">
+  <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.22.0"></script>
+<script type="module" src="js/main.js?v=1.23.0"></script>
 </body>
 </html>

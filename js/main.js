@@ -20,6 +20,7 @@ import { createConverterView } from './ui/converter.js';
 import { createKeypad } from './ui/keypad.js';
 import { $, createToast, shareText } from './ui/dom.js';
 import { createPickerView } from './ui/picker.js';
+import { createPullToRefresh } from './ui/pull-refresh.js';
 import { createPurchaseView } from './ui/purchase.js';
 import { createRatesView } from './ui/rates.js';
 import { createShell } from './ui/shell.js';
@@ -127,6 +128,15 @@ const bankView = createBanksView(app, {
 // An amount just copied elsewhere is offered on return; it goes where the user is
 const clipHint = createClipboardHint(app, {
   onApply: pasted => (state.view === 'shop' ? purchase.applyPasted(pasted) : converter.applyPasted(pasted))
+});
+
+// Pulling the page down from its top refreshes every source, like the button
+createPullToRefresh({
+  indicator: $('#ptr'),
+  canStart: () => document.body.classList.contains('is-ready')
+    && !document.body.classList.contains('has-keypad')
+    && !document.querySelector('.sheet.is-open'),
+  onRefresh: () => refreshRates({ manual: true })
 });
 
 function renderAll() {

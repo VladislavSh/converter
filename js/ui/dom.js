@@ -1,4 +1,5 @@
 // Small DOM helpers shared by the views.
+import { gestureAxis, sheetShouldClose } from '../core/gestures.js';
 
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -16,11 +17,83 @@ export const ICONS = Object.freeze({
 });
 
 const SHEET_FOCUS_DELAY_MS = 250; // after the opening transition
+const FLICK_STALE_MS = 100; // a finger that stopped before letting go is not flicking
+const BOTTOM_SHEET = '(max-width: 699px)'; // wider screens show a dialog in the middle (css)
+
+/**
+ * Lets a bottom sheet be dragged down with a finger: it follows the finger and
+ * closes when let go a third of the way down or flicked; otherwise it springs
+ * back. Content scrolled away from its top scrolls first; the currency grips
+ * keep their own dragging.
+ */
+function dragToClose(sheet, close) {
+  const panel = $('.sheet__panel', sheet);
+  const backdrop = $('.sheet__backdrop', sheet);
+  const bottomSheet = matchMedia(BOTTOM_SHEET);
+  let drag = null; // {x, y, axis, height, lastY, lastT, velocity}
+
+  const scrolledDown = target => {
+    for (let node = target; node; node = node.parentElement) {
+      if (node.scrollTop > 0) return true;
+      if (node === panel) return false;
+    }
+    return false;
+  };
+
+  panel.addEventListener('touchstart', event => {
+    drag = null;
+    if (!bottomSheet.matches || event.touches.length !== 1) return;
+    if (event.target.closest('.pick__drag') || scrolledDown(event.target)) return;
+    const point = event.touches[0];
+    drag = {
+      x: point.clientX, y: point.clientY, axis: null, height: panel.offsetHeight,
+      lastY: point.clientY, lastT: event.timeStamp, velocity: 0
+    };
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', event => {
+    if (!drag) return;
+    const point = event.touches[0];
+    const dy = point.clientY - drag.y;
+    if (!drag.axis) {
+      drag.axis = gestureAxis(point.clientX - drag.x, dy);
+      if (!drag.axis) return;
+      if (drag.axis !== 'down') { // up: the content scrolls; sideways: a list of chips
+        drag = null;
+        return;
+      }
+      sheet.classList.add('is-dragging'); // the panel follows the finger, no easing
+    }
+    if (event.cancelable) event.preventDefault();
+    const dt = event.timeStamp - drag.lastT;
+    if (dt > 0) drag.velocity = (point.clientY - drag.lastY) / dt;
+    drag.lastY = point.clientY;
+    drag.lastT = event.timeStamp;
+    const offset = Math.max(0, dy);
+    panel.style.transform = `translate(-50%, ${offset}px)`;
+    backdrop.style.opacity = String(1 - Math.min(1, offset / drag.height));
+  }, { passive: false });
+
+  const release = event => {
+    if (!drag) return;
+    const { axis, y, lastY, lastT, height } = drag;
+    const velocity = event.timeStamp - lastT > FLICK_STALE_MS ? 0 : drag.velocity;
+    drag = null;
+    if (axis !== 'down') return;
+    // Back to the stylesheet: it animates from where the finger left the panel
+    sheet.classList.remove('is-dragging');
+    panel.style.transform = '';
+    backdrop.style.opacity = '';
+    if (event.type === 'touchend' && sheetShouldClose({ dy: lastY - y, velocity, height })) close();
+  };
+  panel.addEventListener('touchend', release, { passive: true });
+  panel.addEventListener('touchcancel', release, { passive: true });
+}
 
 /**
  * A bottom sheet (dialog). While it is open the page behind is inert; it
- * closes on its backdrop, on any [data-close] inside it and on Escape, and
- * gives the focus back to what opened it.
+ * closes on its backdrop, on any [data-close] inside it, on Escape and when
+ * dragged down, and gives the focus back to what opened it.
  * @param {HTMLElement} sheet  the .sheet element
  * @param {HTMLElement} page   what to make inert while the sheet is open
  */
@@ -54,6 +127,7 @@ export function createSheet(sheet, page) {
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') close();
   });
+  dragToClose(sheet, close);
   return { open, close, isOpen };
 }
 
