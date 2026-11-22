@@ -33,14 +33,14 @@ const MARKERS = [
 const MARKER_CODES = new Set(MARKERS.map(([, code]) => code));
 
 // Either thousands grouped by spaces/apostrophes ("12 990,50"), or digits with dots and commas
-const NUMBER = /\d{1,3}(?:[   '’]\d{3})+(?!\d)(?:[.,]\d+)?|\d+(?:[.,]\d+)*/g;
+const NUMBER = /\d{1,3}(?:[ \u00A0\u202F'’]\d{3})+(?!\d)(?:[.,]\d+)?|\d+(?:[.,]\d+)*/g;
 
 /**
  * Turns one number token into a value, working out which separator is the
  * decimal one. @returns {number|null}
  */
 export function parseNumberToken(token) {
-  let digits = String(token).replace(/[   '’]/g, '');
+  let digits = String(token).replace(/[ \u00A0\u202F'’]/g, '');
   const dots = digits.split('.').length - 1;
   const commas = digits.split(',').length - 1;
 

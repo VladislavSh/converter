@@ -1,5 +1,18 @@
-// Human-readable currency names and symbols.
-import { CRYPTO_BY_CODE, FIAT_EXTRA, isCrypto } from '../data/currencies.js';
+// Human-readable currency names, symbols and flags.
+import { CRYPTO_BY_CODE, FIAT_EXTRA, FLAG_OVERRIDE, isCrypto } from '../data/currencies.js';
+
+/**
+ * ISO country code of the currency's flag ("us" for USD), or '' when there is
+ * none: crypto and supranational codes such as XAU.
+ */
+export function flagCountry(code) {
+  if (isCrypto(code)) return '';
+  const country = FLAG_OVERRIDE[code] ?? (code.startsWith('X') ? '' : code.slice(0, 2).toLowerCase());
+  return /^[a-z]{2}$/.test(country) ? country : '';
+}
+
+/** A currency the app can name: listed crypto or a fiat code Intl knows. */
+export const isKnownCurrency = code => isCrypto(code) || isKnownFiat(code);
 
 const displayNamesCache = new Map();
 

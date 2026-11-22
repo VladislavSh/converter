@@ -1,19 +1,22 @@
 // Offline support. Only same-origin files are cached; the rate APIs always go
 // to the network (the app keeps the last rates itself). No third-party hosts.
-const VERSION = 'flux-1.6.0'; // keep in sync with APP_VERSION in js/config.js
-const FLAGS = 'flux-flags'; // flag images never change, so this cache survives releases
+const PREFIX = 'cartrate-';
+const VERSION = `${PREFIX}1.7.0`; // keep in sync with APP_VERSION in js/config.js
+const FLAGS = `${PREFIX}flags`; // flag images never change, so this cache survives releases
 const SHELL = [
   './',
   'index.html',
   'css/style.css',
   'js/config.js',
   'js/core/currency-list.js',
+  'js/core/deep-link.js',
   'js/core/expression.js',
   'js/core/format.js',
   'js/core/names.js',
   'js/core/pasted-amount.js',
   'js/core/purchase.js',
   'js/core/rates.js',
+  'js/core/share-text.js',
   'js/core/state.js',
   'js/data/currencies.js',
   'js/i18n.js',
@@ -21,6 +24,7 @@ const SHELL = [
   'js/services/rates-api.js',
   'js/services/storage.js',
   'js/services/sw-update.js',
+  'js/services/url-sync.js',
   'js/theme-init.js',
   'js/ui/badge.js',
   'js/ui/converter.js',
@@ -39,55 +43,76 @@ const SHELL = [
   'manifest.webmanifest'
 ];
 
-self.addEventListener('install', e => {
-  // fetch the shell fresh (not from the HTTP cache) so a new version never installs stale files
-  e.waitUntil(
+self.addEventListener('install', event => {
+  // Fetch the shell fresh (not from the HTTP cache) so a new version never installs stale files
+  event.waitUntil(
     caches.open(VERSION)
-      .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))))
+      .then(cache => cache.addAll(SHELL.map(url => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      // Cache Storage is shared by every site on this origin (all GitHub Pages
-      // projects of one account), so only this app's own old caches are removed.
-      .then(keys => Promise.all(keys
-        .filter(key => key.startsWith('flux-') && key !== VERSION && key !== FLAGS)
-        .map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
-});
-
-const putOk = (cacheName, req, res) => {
-  if (res && res.ok && res.type === 'basic') {
-    const copy = res.clone();
-    caches.open(cacheName).then(c => c.put(req, copy));
-  }
-  return res;
+/**
+ * A cache left by a release that used other cache names: every entry in it is
+ * a file of this app. Cache Storage is shared by all sites on the origin (all
+ * GitHub Pages projects of one account), so other sites' caches never match.
+ */
+const isOwnLeftover = async name => {
+  const requests = await (await caches.open(name)).keys();
+  return requests.length > 0 && requests.every(request => request.url.startsWith(self.registration.scope));
 };
 
-self.addEventListener('fetch', e => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== location.origin) return; // rate APIs etc. — straight to network
+const removeOldCaches = async () => {
+  for (const name of await caches.keys()) {
+    if (name === VERSION || name === FLAGS) continue;
+    if (name.startsWith(PREFIX) || await isOwnLeftover(name)) await caches.delete(name);
+  }
+};
 
-  // Flags: cache first
-  if (url.pathname.includes('/icons/flags/')) {
-    e.respondWith(
-      caches.match(req).then(hit => hit || fetch(req).then(res => putOk(FLAGS, req, res)))
+self.addEventListener('activate', event => {
+  event.waitUntil(removeOldCaches().then(() => self.clients.claim()));
+});
+
+// Keeps a copy of a good same-origin response and passes the response on
+const remember = (cacheName, key, response) => {
+  if (response && response.ok && response.type === 'basic') {
+    const copy = response.clone();
+    caches.open(cacheName).then(cache => cache.put(key, copy));
+  }
+  return response;
+};
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== location.origin) return; // rate APIs: straight to the network
+
+  // The page itself. Links to calculations differ only in the query
+  // (?mode=…&amount=…), so every one of them is the same cached page.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request, { cache: 'no-cache' })
+        .then(response => remember(VERSION, './', response))
+        .catch(() => caches.match('./').then(hit => hit || caches.match('index.html')))
     );
     return;
   }
 
-  // App shell: network first so updates arrive quickly, cache when offline.
-  // cache: 'no-cache' revalidates with the server instead of trusting the
-  // browser's HTTP cache (GitHub Pages lets it keep files for 10 minutes).
-  e.respondWith(
-    fetch(req, { cache: 'no-cache' })
-      .then(res => putOk(VERSION, req, res))
-      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('index.html')))
+  // Flags: cache first
+  if (url.pathname.includes('/icons/flags/')) {
+    event.respondWith(
+      caches.match(request).then(hit => hit || fetch(request).then(response => remember(FLAGS, request, response)))
+    );
+    return;
+  }
+
+  // Scripts, styles, fonts: network first so updates arrive quickly, the cache
+  // when offline. 'no-cache' revalidates with the server instead of trusting
+  // the browser's HTTP cache (GitHub Pages lets it keep files for 10 minutes).
+  event.respondWith(
+    fetch(request, { cache: 'no-cache' })
+      .then(response => remember(VERSION, request, response))
+      .catch(() => caches.match(request, { ignoreSearch: true }))
   );
 });

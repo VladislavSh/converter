@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { formatMoney } from '../js/core/format.js';
 import { calcDelivery, calcPurchase, parseNumber, paymentFee, roundWeightUp } from '../js/core/purchase.js';
 import { convert } from '../js/core/rates.js';
 import { SHOP_DEFAULTS } from '../js/core/state.js';
@@ -38,6 +39,54 @@ test('payment fee: other rules', () => {
   assert.equal(paymentFee(100, { percent: 0, freeBelow: 0, minimum: 5 }), 0, 'zero percent means no fee at all');
   assert.equal(paymentFee(30, { percent: 3, freeBelow: 0, minimum: 2 }), 2, 'minimum applies');
   assert.equal(paymentFee(100, { percent: 3, freeBelow: 0, minimum: 2 }), 3, 'minimum does not cap');
+});
+
+// The rule the app ships with (WeChat Pay / Alipay with a foreign card):
+// a payment of up to 200 ¥ INCLUSIVE costs nothing extra — there is no fixed
+// "+2 ¥" — and above 200 ¥ the fee is 3% of the whole payment.
+test('fee around the 200 ¥ threshold, to the fen', () => {
+  const cases = [
+    // price,  fee,     order total, shown fee, shown total
+    ['100',    0,       100,         null,      '100,00'],
+    ['199',    0,       199,         null,      '199,00'],
+    ['199.99', 0,       199.99,      null,      '199,99'],
+    ['200',    0,       200,         null,      '200,00'],
+    ['200.01', 6.0003,  206.0103,    '6,00',    '206,01'],
+    ['201',    6.03,    207.03,      '6,03',    '207,03'],
+    ['1000',   30,      1030,        '30,00',   '1 030,00']
+  ];
+  for (const [price, fee, total, shownFee, shownTotal] of cases) {
+    const r = calcPurchase(shop({ price, bufPct: '0' }), cv);
+    close(r.fee.feeCny, fee, `fee for ${price} ¥`);
+    close(r.orderTotal, total, `total for ${price} ¥`);
+    if (fee === 0) {
+      assert.equal(r.fee.feeCny, 0, `${price} ¥: exactly zero, not a rounding leftover`);
+      assert.equal(r.orderTotal, Number(price), `${price} ¥: nothing is added below the threshold`);
+    } else {
+      assert.equal(formatMoney(r.feeInCurrency, 'CNY').replace(/\u00A0/g, ' '), shownFee);
+    }
+    assert.equal(formatMoney(r.orderTotal, 'CNY').replace(/[\u00A0\u202F]/g, ' '), shownTotal);
+  }
+});
+
+test('the threshold is compared with the calculated price, not with its text', () => {
+  const fee = price => calcPurchase(shop({ price }), cv).fee.feeCny;
+  assert.equal(fee('100+100'), 0, '200 exactly');
+  assert.equal(fee('40*5'), 0);
+  assert.equal(fee('199,99'), 0, 'comma as the decimal separator');
+  assert.ok(fee('100+100.01') > 0, '200.01');
+  assert.ok(fee('200,01') > 0);
+  close(fee('67*3'), 6.03, '201');
+});
+
+test('a card linked directly in Pinduoduo: 3% of any amount', () => {
+  const direct = { freeBelow: '0', svcMin: '0' };
+  close(calcPurchase(shop({ price: '100', ...direct }), cv).fee.feeCny, 3);
+  close(calcPurchase(shop({ price: '199', ...direct }), cv).fee.feeCny, 5.97);
+  close(calcPurchase(shop({ price: '200', ...direct }), cv).fee.feeCny, 6);
+  close(calcPurchase(shop({ price: '201', ...direct }), cv).fee.feeCny, 6.03);
+  // where "about 2 yuan on a small order" comes from: 3% of 67 ¥
+  close(calcPurchase(shop({ price: '67', ...direct }), cv).fee.feeCny, 2.01);
 });
 
 test('weight is rounded up to the step', () => {

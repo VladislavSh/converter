@@ -16,7 +16,7 @@ test('number tokens: which separator is the decimal one', () => {
     '1,299.00': 1299, '1.299,00': 1299, '1,299,000': 1299000, '1.299.000': 1299000,
     '1,299': 1299, '12.500': 12500, '1234,567': 1234.567, '12,34': 12.34,
     '12 990': 12990, '12 990,50': 12990.5, '1 234 567.89': 1234567.89, "1'299.90": 1299.9,
-    '12 990': 12990
+    '12\u00A0990': 12990
   };
   for (const [token, expected] of Object.entries(cases)) {
     assert.equal(parseNumberToken(token), expected, `"${token}"`);

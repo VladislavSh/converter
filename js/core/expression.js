@@ -15,7 +15,7 @@ export const sanitizeExpression = text => String(text ?? '')
   .slice(0, MAX_LENGTH);
 
 const normalize = text => String(text ?? '')
-  .replace(/[\s  ]/g, '')
+  .replace(/[\s\u00A0\u202F]/g, '')
   .replace(/,/g, '.')
   .replace(/[×xх]/gi, '*')
   .replace(/÷/g, '/')

@@ -1,11 +1,12 @@
 // App-wide constants. APP_VERSION must match VERSION in sw.js and the ?v=
 // query in index.html (tests/project.test.js checks this).
-export const APP_VERSION = '1.6.0';
+export const APP_NAME = 'CartRate';
+export const APP_VERSION = '1.7.0';
 
 export const STORAGE_KEYS = Object.freeze({
-  state: 'flux_state',
-  rates: 'flux_rates',
-  updatedFlag: 'flux_updated'
+  state: 'cartrate_state',
+  rates: 'cartrate_rates',
+  updatedFlag: 'cartrate_updated'
 });
 
 // The only hosts the app talks to (see the Content-Security-Policy in index.html)
@@ -26,5 +27,6 @@ export const TIMING = Object.freeze({
   splashMinMs: 1400,
   splashMaxMs: 7000,
   splashMaxCachedMs: 1800,
-  toastMs: 1800
+  toastMs: 2200,
+  urlSyncMs: 300
 });

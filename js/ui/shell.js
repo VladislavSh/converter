@@ -1,6 +1,6 @@
 // App chrome: theme, language, rates status line, the two view tabs, splash
 // screen, footer and the "Install" button.
-import { APP_VERSION, RATE_SOURCES } from '../config.js';
+import { APP_NAME, APP_VERSION, RATE_SOURCES } from '../config.js';
 import { $, $$ } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
@@ -34,7 +34,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   function applyTexts() {
     const { t } = app;
     document.documentElement.lang = app.state.lang;
-    document.title = `Flux — ${t('subtitle').toLowerCase()}`;
+    document.title = `${APP_NAME} — ${t('subtitle').toLowerCase()}`;
     $$('[data-i18n]').forEach(node => { node.textContent = t(node.dataset.i18n); });
     $$('[data-i18n-ph]').forEach(node => { node.placeholder = t(node.dataset.i18nPh); });
     $$('[data-i18n-aria]').forEach(node => { node.setAttribute('aria-label', t(node.dataset.i18nAria)); });

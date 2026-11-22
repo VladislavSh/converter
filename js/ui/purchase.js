@@ -4,6 +4,7 @@ import { isExpression, sanitizeExpression } from '../core/expression.js';
 import { formatMoney, formatNumber, plainNumber } from '../core/format.js';
 import { parsePastedAmount, pastedPrice } from '../core/pasted-amount.js';
 import { calcPurchase, parseNumber } from '../core/purchase.js';
+import { breakdownLines, purchaseShareText } from '../core/share-text.js';
 import { $, $$, copyText, escapeHtml, readClipboardText } from './dom.js';
 
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
@@ -13,6 +14,7 @@ export function createPurchaseView(app) {
     price: $('#sh-price'),
     paste: $('#sh-paste'),
     copy: $('#sh-copy'),
+    share: $('#sh-share'),
     currency: $('#sh-cur'),
     card: $('#sh-card'),
     presets: $('#sh-presets'),
@@ -129,7 +131,8 @@ export function createPurchaseView(app) {
       el.feeExplain.textContent = t('feeNone');
       return;
     }
-    let html = t('feeRule', { p: bold(`${fee.percent}%`) });
+    const percent = formatNumber(fee.percent, app.locale(), 2);
+    let html = t('feeRule', { p: bold(`${percent}%`) });
     if (fee.freeBelow > 0) html += t('feeFree', { lim: bold(yuan(fee.freeBelow)) });
     if (fee.minimum > 0) html += t('feeMin', { min: bold(yuan(fee.minimum)) });
     html += `. ${t('feePerPay')}`;
@@ -140,7 +143,7 @@ export function createPurchaseView(app) {
         calc = t('feeCalcFree', { a: yuan(fee.priceCny), lim: yuan(fee.freeBelow) });
       } else {
         const over = fee.freeBelow > 0 ? ` &gt; ${yuan(fee.freeBelow)}` : '';
-        calc = `${yuan(fee.priceCny)}${over} → ${fee.percent}% × ${yuan(fee.priceCny)} = ${yuan(fee.rawFeeCny)}`;
+        calc = `${yuan(fee.priceCny)}${over} → ${percent}% × ${yuan(fee.priceCny)} = ${yuan(fee.rawFeeCny)}`;
         if (fee.isMinimum) calc += ` &lt; ${yuan(fee.minimum)} → ${t('feeCalcMin', { min: yuan(fee.minimum) })}`;
       }
       html += `<span class="calc">${t('feeNow', { calc })}</span>`;
@@ -149,30 +152,12 @@ export function createPurchaseView(app) {
   }
 
   function renderBreakdown(r, money) {
-    const { t } = app;
-    const { currency, card } = r;
-    const rows = [];
-    if (r.hasGoods) {
-      rows.push(rowHtml(t('shGoods'), `${money(r.price, currency)} ${currency}`));
-      if (r.feeInCurrency > 0) {
-        const label = r.fee.isMinimum ? t('shSvcLineMin') : t('shSvcLinePct', { p: r.fee.percent });
-        rows.push(rowHtml(label, `+${money(r.feeInCurrency, currency)} ${currency}`));
-      } else if (r.fee.percent > 0 && r.fee.freeBelow > 0) {
-        rows.push(rowHtml(t('shSvcLine'), escapeHtml(t('shFreeLbl', { lim: formatNumber(r.fee.freeBelow, app.locale(), 2) }))));
-      }
-      const inCard = currency === card ? '' : ` ≈ ${money(r.orderInCard, card)} ${card}`;
-      rows.push(rowHtml(t('shOrder'), `${money(r.orderTotal, currency)} ${currency}${inCard}`, { strong: true }));
-      if (r.bankPercent > 0) rows.push(rowHtml(t('shBankLine', { p: r.bankPercent }), `+${money(r.bankFee, card)} ${card}`));
-    }
-    if (r.deliveryOnCard) {
-      const method = t(r.delivery.method === 'air' ? 'dlAir' : 'dlAuto').toLowerCase();
-      rows.push(rowHtml(t('shDeliveryLine', { method }), `+${money(r.deliveryPart, card)} ${card}`));
-    }
-    if (r.hasTopup) {
-      rows.push(rowHtml(t('shCharged'), `≈ ${money(r.charged, card)} ${card}`, { strong: true }));
-      if (r.buffer > 0) rows.push(rowHtml(t('shBufLine', { p: r.bufferPercent }), `+${money(r.buffer, card)} ${card}`));
-    }
-    el.rows.innerHTML = rows.join('');
+    const { card } = r;
+    // The same lines go into the share message, so they are built in one place
+    el.rows.innerHTML = breakdownLines(r, { t: app.t, locale: app.locale() })
+      .map(line => rowHtml(line.label, escapeHtml(line.value), { strong: line.strong }))
+      .join('');
+    el.share.hidden = !r.hasTopup && !(r.delivery.cost > 0);
 
     el.topup.textContent = r.hasTopup ? `${money(r.topup, card)} ${card}` : '—';
     el.copy.hidden = !r.hasTopup;
@@ -309,6 +294,18 @@ export function createPurchaseView(app) {
     const text = plainNumber(lastResult.topup);
     const copied = await copyText(text);
     app.toast(copied ? app.t('copied', { text: `${text} ${lastResult.card}` }) : app.t('copyFailed'));
+  });
+
+  el.share.addEventListener('click', () => {
+    const text = lastResult && purchaseShareText({
+      result: lastResult,
+      convert: app.convert,
+      t: app.t,
+      locale: app.locale(),
+      url: app.link()
+    });
+    if (text) app.share(text);
+    else app.toast(app.t('shareEmpty'));
   });
 
   el.presets.addEventListener('click', event => {

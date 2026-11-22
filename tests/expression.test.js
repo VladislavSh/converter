@@ -13,7 +13,7 @@ test('plain numbers', () => {
   assert.equal(evaluate('5.'), 5);
   assert.equal(evaluate('-7'), -7);
   assert.equal(evaluate('1 000 000'), 1000000, 'spaces are ignored');
-  assert.equal(evaluate('1 000'), 1000, 'non-breaking spaces are ignored');
+  assert.equal(evaluate('1\u00A0000'), 1000, 'non-breaking spaces are ignored');
 });
 
 test('arithmetic and precedence', () => {

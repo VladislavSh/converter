@@ -4,6 +4,7 @@ import { formatAmount, plainNumber } from '../core/format.js';
 import { currencyName } from '../core/names.js';
 import { switchSource } from '../core/currency-list.js';
 import { applyPastedAmount, parsePastedAmount } from '../core/pasted-amount.js';
+import { converterShareText } from '../core/share-text.js';
 import { badgeHtml } from './badge.js';
 import { $, $$, ICONS, copyText, escapeHtml, readClipboardText, replayAnimation } from './dom.js';
 
@@ -22,7 +23,8 @@ export function createConverterView(app, { onEditList }) {
     expr: $('#amount-expr'),
     ops: $('#amount-ops'),
     results: $('#results'),
-    edit: $('#manage-btn')
+    edit: $('#manage-btn'),
+    share: $('#conv-share')
   };
   let builtFor = '';
 
@@ -256,6 +258,20 @@ export function createConverterView(app, { onEditList }) {
   });
 
   el.edit.addEventListener('click', () => onEditList());
+
+  // --- share the calculation: the amounts, the rates and a link back to it ---
+  el.share.addEventListener('click', () => {
+    const text = converterShareText({
+      state: app.state,
+      convert: app.convert,
+      t: app.t,
+      locale: app.locale(),
+      ratesAt: app.rates?.ts,
+      url: app.link()
+    });
+    if (text) app.share(text);
+    else app.toast(app.t('shareEmpty'));
+  });
 
   return { render };
 }

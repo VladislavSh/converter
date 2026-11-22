@@ -17,7 +17,8 @@ export const SHOP_DEFAULTS = Object.freeze({
 /** Currencies an item price can be entered in (the options of the price select). */
 export const PRICE_CURRENCIES = Object.freeze(['CNY', 'USD', 'UZS']);
 
-const SHOP_ENUMS = {
+/** Purchase-form fields with a fixed set of values. */
+export const SHOP_ENUMS = {
   priceCur: PRICE_CURRENCIES,
   card: ['USD', 'UZS'],
   dlMethod: ['air', 'auto'],
@@ -31,6 +32,10 @@ const MAX_TEXT = 60;
 const LEGACY_DEFAULT_LIST = ['USD', 'CNY', 'UZS', 'EUR', 'RUB', 'BTC'];
 
 const isPlainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/** Whether a value read from storage has the shape of this app's saved state. */
+export const isSavedState = value =>
+  isPlainObject(value) && Number.isInteger(value.v) && Array.isArray(value.list) && isPlainObject(value.shop);
 const cleanText = (value, fallback) => (typeof value === 'string' ? value.slice(0, MAX_TEXT) : fallback);
 
 function cleanList(raw) {

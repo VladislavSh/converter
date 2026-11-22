@@ -1,34 +1,55 @@
 // Entry point: builds the state, creates the views and keeps rates fresh.
 import { APP_VERSION, STORAGE_KEYS, TIMING } from './config.js';
+import { applyDeepLink } from './core/deep-link.js';
+import { isKnownCurrency } from './core/names.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
 import { loadLatestRates } from './services/rates-api.js';
-import { readJson, takeSessionFlag, writeJson } from './services/storage.js';
+import { adoptEarlierStorage, readJson, takeSessionFlag, writeJson } from './services/storage.js';
 import { registerServiceWorker } from './services/sw-update.js';
+import { createUrlSync, currentLink } from './services/url-sync.js';
 import { installFlagFallback } from './ui/badge.js';
 import { createConverterView } from './ui/converter.js';
-import { $, createToast } from './ui/dom.js';
+import { $, createToast, shareText } from './ui/dom.js';
 import { createPickerView } from './ui/picker.js';
 import { createPurchaseView } from './ui/purchase.js';
 import { createShell } from './ui/shell.js';
+
+try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
 
 const state = buildState(readJson(STORAGE_KEYS.state), {
   language: navigator.language,
   prefersLight: matchMedia('(prefers-color-scheme: light)').matches
 });
+// A link to a calculation (?mode=…) wins over what was saved on this device
+applyDeepLink(state, location.search, isKnownCurrency);
 let snapshot = restoreSnapshot(readJson(STORAGE_KEYS.rates));
 
+const syncUrl = createUrlSync(state);
+const toast = createToast($('#toast'), TIMING.toastMs);
+
 // What every view gets: the state plus a few services. Views never touch
-// storage or the network themselves.
+// storage, the network or the address bar themselves.
 const app = {
   state,
   get rates() { return snapshot; },
   t: (key, vars) => translate(state.lang, key, vars),
   locale: () => localeOf(state.lang),
   convert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
-  save: () => writeJson(STORAGE_KEYS.state, state),
-  toast: createToast($('#toast'), TIMING.toastMs)
+  save: () => {
+    writeJson(STORAGE_KEYS.state, state);
+    syncUrl();
+  },
+  toast,
+  /** A link that opens the current tab with the same numbers. */
+  link: () => currentLink(state),
+  /** Opens the system share sheet, or copies the text where there is none. */
+  share: async text => {
+    const outcome = await shareText(text);
+    if (outcome === 'copied') toast(translate(state.lang, 'shareCopied'));
+    else if (outcome === 'failed') toast(translate(state.lang, 'copyFailed'));
+  }
 };
 
 installFlagFallback();

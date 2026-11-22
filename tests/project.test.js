@@ -2,10 +2,12 @@
 // file list, and the "nothing but our own files and three rate APIs" rule.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APP_VERSION, RATE_SOURCES } from '../js/config.js';
+import vm from 'node:vm';
+import { APP_NAME, APP_VERSION, RATE_SOURCES, STORAGE_KEYS } from '../js/config.js';
 import { DEFAULT_LIST, FLAG_OVERRIDE, POPULAR } from '../js/data/currencies.js';
 import { LANGS, MESSAGES, translate } from '../js/i18n.js';
 
@@ -85,7 +87,7 @@ test('translate fills placeholders and falls back safely', () => {
 
 test('the version is the same everywhere', () => {
   assert.match(APP_VERSION, /^\d+\.\d+\.\d+$/);
-  assert.equal(sw.match(/const VERSION = '([^']+)'/)[1], `flux-${APP_VERSION}`, 'sw.js');
+  assert.equal(sw.match(/const VERSION = `\$\{PREFIX\}([^`]+)`/)[1], APP_VERSION, 'sw.js');
   assert.equal(JSON.parse(read('package.json')).version, APP_VERSION, 'package.json');
   const queries = [...html.matchAll(/\?v=([\d.]+)/g)].map(m => m[1]);
   assert.ok(queries.length >= 3);
@@ -108,11 +110,70 @@ test('every script, style and font the page needs is precached', () => {
   for (const file of needed) assert.ok(shell.includes(file), `not available offline: ${file}`);
 });
 
-test('the service worker only ever deletes its own caches', () => {
+/** Runs sw.js against a fake Cache Storage and returns its event handlers. */
+function loadServiceWorker(stored) {
+  const scope = 'https://example.github.io/converter/';
+  const handlers = {};
+  const cacheStorage = {
+    keys: async () => Object.keys(stored),
+    open: async name => ({ keys: async () => (stored[name] ?? []).map(url => ({ url })) }),
+    delete: async name => delete stored[name]
+  };
+  const context = vm.createContext({
+    self: {
+      addEventListener: (type, handler) => { handlers[type] = handler; },
+      registration: { scope },
+      clients: { claim: async () => {} },
+      skipWaiting: async () => {}
+    },
+    caches: cacheStorage,
+    location: new URL(scope),
+    URL
+  });
+  vm.runInContext(sw, context);
+  return handlers;
+}
+
+test('the service worker removes its own old caches and nobody else\'s', async () => {
   // Cache Storage is shared by all GitHub Pages projects of one account
-  assert.match(sw, /key\.startsWith\('flux-'\)/);
-  assert.match(sw.match(/const VERSION = '([^']+)'/)[1], /^flux-/);
-  assert.match(sw.match(/const FLAGS = '([^']+)'/)[1], /^flux-/);
+  const app = 'https://example.github.io/converter/';
+  const stored = {
+    [`cartrate-${APP_VERSION}`]: [`${app}index.html`],
+    'cartrate-flags': [`${app}icons/flags/us.svg`],
+    'cartrate-1.0.0': [`${app}index.html`],
+    'earlier-name-1.6.0': [`${app}index.html`, `${app}js/main.js`],
+    'another-site-v1': ['https://example.github.io/blog/index.html'],
+    'mixed-cache': [`${app}index.html`, 'https://example.github.io/blog/app.js'],
+    'empty-cache': []
+  };
+  let done;
+  loadServiceWorker(stored).activate({ waitUntil: promise => { done = promise; } });
+  await done;
+  assert.deepEqual(Object.keys(stored).sort(), [
+    'another-site-v1', 'cartrate-flags', `cartrate-${APP_VERSION}`, 'empty-cache', 'mixed-cache'
+  ].sort());
+});
+
+test('every script parses', () => {
+  for (const file of [...jsFiles, 'sw.js']) {
+    assert.doesNotThrow(
+      () => execFileSync(process.execPath, ['--check', join(ROOT, file)], { stdio: 'pipe' }),
+      `syntax error in ${file}`
+    );
+  }
+});
+
+test('the app is called CartRate everywhere a name is shown', () => {
+  assert.equal(APP_NAME, 'CartRate');
+  assert.match(html, /<title>CartRate — /);
+  assert.match(html, /<h1 class="brand__title">CartRate<\/h1>/);
+  const manifest = JSON.parse(read('manifest.webmanifest'));
+  assert.equal(manifest.short_name, 'CartRate');
+  assert.match(manifest.name, /^CartRate/);
+  assert.equal(JSON.parse(read('package.json')).name, 'cartrate');
+  for (const key of Object.values(STORAGE_KEYS)) assert.match(key, /^cartrate_/);
+  // theme-init.js runs before the modules and cannot import the key
+  assert.ok(read('js/theme-init.js').includes(`'${STORAGE_KEYS.state}'`));
 });
 
 test('every import points to an existing file', () => {

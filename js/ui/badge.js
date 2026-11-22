@@ -1,7 +1,7 @@
 // Round currency badge: a self-hosted flag for fiat, a coloured monogram for
 // crypto and for currencies without a flag.
-import { CRYPTO_BY_CODE, FLAG_OVERRIDE, isCrypto } from '../data/currencies.js';
-import { currencySymbol } from '../core/names.js';
+import { CRYPTO_BY_CODE, isCrypto } from '../data/currencies.js';
+import { currencySymbol, flagCountry } from '../core/names.js';
 import { escapeHtml } from './dom.js';
 
 function hueOf(code) {
@@ -11,11 +11,6 @@ function hueOf(code) {
 }
 
 const monogram = symbol => (symbol.length > 1 ? `<small>${escapeHtml(symbol)}</small>` : escapeHtml(symbol));
-
-function flagCountry(code) {
-  const country = FLAG_OVERRIDE[code] ?? (code.startsWith('X') ? '' : code.slice(0, 2).toLowerCase());
-  return /^[a-z]{2}$/.test(country) ? country : '';
-}
 
 export function badgeHtml(code) {
   if (isCrypto(code)) {

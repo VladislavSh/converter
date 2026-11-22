@@ -1,6 +1,6 @@
 {
-  "name": "flux-converter",
-  "version": "1.6.0",
+  "name": "cartrate",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Currency converter and purchase calculator (static PWA, no build step)",

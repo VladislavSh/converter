@@ -47,6 +47,24 @@ export async function readClipboardText() {
   }
 }
 
+/**
+ * Shares text through the system share sheet, or copies it where there is none
+ * (most desktop browsers). Must be called from a tap or click.
+ * @returns {Promise<'shared'|'copied'|'cancelled'|'failed'>}
+ */
+export async function shareText(text) {
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ text });
+      return 'shared';
+    } catch (error) {
+      if (error?.name === 'AbortError') return 'cancelled'; // the user closed the sheet
+      // anything else (not allowed, unsupported data): fall back to copying
+    }
+  }
+  return (await copyText(text)) ? 'copied' : 'failed';
+}
+
 /** Restarts a CSS animation tied to a class. */
 export function replayAnimation(element, className) {
   element.classList.remove(className);

@@ -6,7 +6,7 @@ import { currencyName, currencySymbol, isKnownFiat } from '../js/core/names.js';
 
 const TABLE = { USD: 1, CNY: 7, UZS: 12000, RUB: 80, BTC: 0.00002 };
 // Intl uses non-breaking spaces for grouping; compare on plain spaces
-const plain = text => text.replace(/[  ]/g, ' ');
+const plain = text => text.replace(/[\u00A0\u202F]/g, ' ');
 
 test('isCurrencyCode accepts only 3–5 capital letters', () => {
   for (const ok of ['USD', 'USDT', 'DOGEX']) assert.equal(isCurrencyCode(ok), true, ok);

@@ -1,7 +1,7 @@
 {
-  "name": "Flux — конвертер валют",
-  "short_name": "Flux",
-  "description": "Быстрый конвертер валют и криптовалют с офлайн-режимом",
+  "name": "CartRate — конвертер валют",
+  "short_name": "CartRate",
+  "description": "Конвертер валют и расчёт покупок: комиссии, доставка и сумма пополнения карты",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
