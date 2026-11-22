@@ -15,6 +15,7 @@ import { registerServiceWorker } from './services/sw-update.js';
 import { createUrlSync, currentLink } from './services/url-sync.js';
 import { installFlagFallback } from './ui/badge.js';
 import { createBanksView } from './ui/banks.js';
+import { createClipboardHint } from './ui/clipboard-hint.js';
 import { createConverterView } from './ui/converter.js';
 import { createKeypad } from './ui/keypad.js';
 import { $, createToast, shareText } from './ui/dom.js';
@@ -89,6 +90,8 @@ const app = {
     syncUrl();
   },
   toast,
+  /** Text the user pasted some other way: the clipboard bar does not offer it again. */
+  markClipboard: text => clipHint?.markHandled(text),
   /** A link that opens the current tab with the same numbers. */
   link: () => currentLink(state),
   /** Opens the system share sheet, or copies the text where there is none. */
@@ -120,7 +123,13 @@ const bankView = createBanksView(app, {
   onEditSource: id => rateSources.edit(id)
 });
 
+// An amount just copied elsewhere is offered on return; it goes where the user is
+const clipHint = createClipboardHint(app, {
+  onApply: pasted => (state.view === 'shop' ? purchase.applyPasted(pasted) : converter.applyPasted(pasted))
+});
+
 function renderAll() {
+  clipHint.render();
   converter.render();
   purchase.render();
   rateSources.render();
@@ -216,6 +225,7 @@ const splashLimit = setTimeout(dismissSplash, snapshot ? TIMING.splashMaxCachedM
 refreshRates({ all: true }).finally(() => {
   clearTimeout(splashLimit);
   dismissSplash();
+  clipHint.check(); // a price copied before the app was opened
 });
 
 window.addEventListener('online', () => refreshRates());

@@ -196,6 +196,7 @@ export function createConverterView(app, { onEditList, keypad }) {
 
   el.paste.addEventListener('click', async () => {
     const text = await readClipboardText();
+    app.markClipboard(text);
     if (text == null) {
       app.toast(app.t('pasteDenied'));
       el.input.focus();
@@ -209,6 +210,7 @@ export function createConverterView(app, { onEditList, keypad }) {
   // The system paste (long press, Ctrl+V) goes through the same parser
   el.input.addEventListener('paste', event => {
     const text = event.clipboardData?.getData('text') ?? '';
+    app.markClipboard(text);
     const pasted = parsePastedAmount(text, hasRate);
     // A calculation ("120*3+15") is pasted as typed; the input handler cleans it up
     if (!pasted || (!pasted.currency && isExpression(text.trim()))) return;
@@ -264,5 +266,5 @@ export function createConverterView(app, { onEditList, keypad }) {
     else app.toast(app.t('shareEmpty'));
   });
 
-  return { render };
+  return { render, applyPasted: replaceWithPasted };
 }

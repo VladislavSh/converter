@@ -9,32 +9,68 @@ import { PRICE_CURRENCIES } from './state.js';
 const MAX_TEXT = 300;
 const MAX_VALUE = 1e15;
 
-// Checked in order, so the specific dollars come before the bare "$".
-// A bare "¥" is read as yuan: this app is used with Chinese marketplaces.
-// Russian words are matched without \b (it only knows Latin letters) and so
-// that "сумма" (amount) is not taken for "сум", nor "Европа" for "евро".
+// A word or code is matched only on its own: "сумма" is not "сум", "рубеж" is
+// not "руб", "USDT" is not "USD". Digits may touch it: "5.99USD", "1500р".
+const L = '(?<![a-zа-яё])';
+const R = '(?![a-zа-яё])';
+const marker = source => new RegExp(source.replaceAll('{L}', L).replaceAll('{R}', R), 'iu');
+
+// Checked in order, so the specific dollars come before the bare "$" and
+// Belarusian roubles before roubles. A bare "¥" is read as yuan: this app is
+// used with Chinese marketplaces.
 const MARKERS = [
-  [/\bHK\s?\$|\bHKD\b/i, 'HKD'],
-  [/\b(?:AU|A)\s?\$|\bAUD\b/i, 'AUD'],
-  [/\b(?:CA|C)\s?\$|\bCAD\b/i, 'CAD'],
-  [/\bS\s?\$|\bSGD\b/i, 'SGD'],
-  [/[¥￥元圆]|\bCNY\b|\bRMB\b|юан|\byuan/i, 'CNY'],
-  [/\$|\bUSD\b|долл|\bdollar/i, 'USD'],
-  [/\bUZS\b|сум(?:ов|ах|а|ы)?(?![а-яё])|сўм|\bso['’ʻ`]m/i, 'UZS'],
-  [/₽|\bRUB\b|\bRUR\b|руб/i, 'RUB'],
-  [/€|\bEUR\b|евро(?![а-яё])|\beuro/i, 'EUR'],
-  [/₸|\bKZT\b|тенге|(?:^|[^а-яё])тг(?![а-яё])/i, 'KZT'],
-  [/£|\bGBP\b/i, 'GBP'],
-  [/円|\bJPY\b|(?:^|[^а-яё])иен/i, 'JPY'],
-  [/₺|\bTRY\b/i, 'TRY'],
-  [/₩|\bKRW\b/i, 'KRW'],
-  [/₹|\bINR\b/i, 'INR'],
-  [/₴|\bUAH\b|грн/i, 'UAH']
+  [marker('{L}hk\\s?\\$|{L}hkd{R}'), 'HKD'],
+  [marker('{L}au?\\s?\\$|{L}aud{R}'), 'AUD'],
+  [marker('{L}ca?\\s?\\$|{L}cad{R}'), 'CAD'],
+  [marker('{L}s\\s?\\$|{L}sgd{R}'), 'SGD'],
+  [marker('{L}бел(?:орусск[а-яё]*)?\\.?\\s*руб|{L}byn{R}'), 'BYN'],
+  [marker('[¥元圆块]|{L}(?:cny|rmb|cnh|yuan|renminbi){R}|{L}юан|{L}жэньминьби'), 'CNY'],
+  [marker('\\$|{L}usd{R}|{L}долл|{L}бакс|{L}dollars?{R}'), 'USD'],
+  [marker('{L}uzs{R}|{L}сум(?:ов|ах|ам|а|ы)?{R}|{L}сўм|{L}so[\'’ʻ‘`]?m{R}'), 'UZS'],
+  [marker('{L}tjs{R}|{L}сомони'), 'TJS'],
+  [marker('{L}kgs{R}|{L}сом(?:ов|а|ы)?{R}'), 'KGS'],
+  [marker('₽|{L}(?:rub|rur|rubles?|roubles?){R}|{L}руб(?:л(?:ь|я|ей|ям|ями|ях))?\\.?{R}|(?<=\\d\\s?)р\\.?{R}'), 'RUB'],
+  [marker('€|{L}eur{R}|{L}евро{R}|{L}euros?{R}'), 'EUR'],
+  [marker('₸|{L}kzt{R}|{L}тенге{R}|{L}тг\\.?{R}'), 'KZT'],
+  [marker('£|{L}gbp{R}|{L}фунт'), 'GBP'],
+  [marker('円|{L}jpy{R}|{L}[ий]ен[аыу]?{R}'), 'JPY'],
+  [marker('₺|{L}лир[аыу]?{R}'), 'TRY'],
+  [marker('₩|{L}krw{R}|{L}вон[аыу]?{R}'), 'KRW'],
+  [marker('₹|{L}inr{R}|{L}рупи'), 'INR'],
+  [marker('₴|{L}uah{R}|{L}грн\\.?{R}|{L}гривн'), 'UAH'],
+  [marker('₾|{L}gel{R}|{L}лари{R}'), 'GEL'],
+  [marker('֏|{L}amd{R}|{L}драм'), 'AMD'],
+  [marker('₼|{L}azn{R}|{L}манат'), 'AZN'],
+  [marker('{L}aed{R}|{L}дирхам'), 'AED'],
+  [marker('฿|{L}thb{R}|{L}бат(?:ов|а)?{R}'), 'THB'],
+  [marker('₫|{L}vnd{R}|{L}донг'), 'VND'],
+  [marker('zł|{L}pln{R}|{L}злот'), 'PLN'],
+  [marker('{L}chf{R}|{L}франк'), 'CHF']
 ];
 const MARKER_CODES = new Set(MARKERS.map(([, code]) => code));
 
+// "15 тыс.", "1,2 млн", "120 ming", "15к" / "15k", "1.2万": the number is multiplied.
+// "15 кг" is not "15 thousand": the letter after "к" is checked.
+const MULTIPLIERS = [
+  [/^\s?(?:тыс(?:яч[аи]?)?\.?|ming|[kк](?![a-zа-яё])|千)/iu, 1e3],
+  [/^\s?万/u, 1e4],
+  [/^\s?(?:млн\.?|миллион(?:а|ов)?|mln|million|mio)(?![a-zа-яё])/iu, 1e6],
+  [/^\s?(?:млрд\.?|миллиард(?:а|ов)?|bln|billion)(?![a-zа-яё])/iu, 1e9]
+];
+
 // Either thousands grouped by spaces/apostrophes ("12 990,50"), or digits with dots and commas
 const NUMBER = /\d{1,3}(?:[ \u00A0\u202F'’]\d{3})+(?!\d)(?:[.,]\d+)?|\d+(?:[.,]\d+)*/g;
+
+/**
+ * Text as copied → text as parsed: full-width digits and signs (１２９９, ￥),
+ * every kind of space (no-break, thin) is made ordinary, invisible ones go.
+ */
+export function normalizePasted(text) {
+  return String(text ?? '').slice(0, MAX_TEXT * 2).normalize('NFKC')
+    .replace(/[\u00A0\u2007\u2009\u200A\u202F\u205F\u3000]/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .slice(0, MAX_TEXT);
+}
 
 /**
  * Turns one number token into a value, working out which separator is the
@@ -69,8 +105,8 @@ export function parseNumberToken(token) {
 }
 
 function findCurrency(text, isKnown) {
-  // An explicit ISO code wins ("KZT 5 000"), as long as the app knows the currency
-  for (const match of text.matchAll(/\b[A-Z]{3,5}\b/g)) {
+  // An explicit ISO code wins ("KZT 5 000", "5.99USD"), as long as the app knows the currency
+  for (const match of text.matchAll(/(?<![A-Za-z])[A-Z]{3,5}(?![A-Za-z])/g)) {
     if (isCurrencyCode(match[0]) && isKnown(match[0])) return { code: match[0], index: match.index };
   }
   for (const [pattern, code] of MARKERS) {
@@ -80,13 +116,20 @@ function findCurrency(text, isKnown) {
   return null;
 }
 
+/** "15 тыс." after a number: by how much it is multiplied (1 when not). */
+function multiplierAfter(text, end) {
+  const rest = text.slice(end, end + 16);
+  for (const [pattern, factor] of MULTIPLIERS) if (pattern.test(rest)) return factor;
+  return 1;
+}
+
 /**
  * @param {string} text  clipboard contents
  * @param {(code: string) => boolean} [isKnown]  whether the app has this currency
  * @returns {{value: number, currency: string|null}|null} null when there is no amount
  */
 export function parsePastedAmount(text, isKnown = code => MARKER_CODES.has(code)) {
-  const source = String(text ?? '').slice(0, MAX_TEXT);
+  const source = normalizePasted(text);
   const numbers = [...source.matchAll(NUMBER)]
     .map(match => ({ value: parseNumberToken(match[0]), start: match.index, end: match.index + match[0].length }))
     .filter(number => number.value != null);
@@ -99,7 +142,38 @@ export function parsePastedAmount(text, isKnown = code => MARKER_CODES.has(code)
     const distance = number => Math.min(Math.abs(number.start - currency.index), Math.abs(number.end - currency.index));
     chosen = numbers.reduce((best, number) => (distance(number) < distance(best) ? number : best));
   }
-  return { value: chosen.value, currency: currency && isKnown(currency.code) ? currency.code : null };
+  const value = Math.round(chosen.value * multiplierAfter(source, chosen.end) * 1e8) / 1e8;
+  if (!(value < MAX_VALUE)) return null;
+  return { value, currency: currency && isKnown(currency.code) ? currency.code : null };
+}
+
+/**
+ * What the clipboard holds, worth offering to paste: an amount with a
+ * currency, or a short text that is only a number. Phone numbers, dates and
+ * order numbers are not.
+ * @param {string} text  the clipboard
+ * @param {(code: string) => boolean} isKnown
+ * @returns {{value: number, currency: string|null, excerpt: string}|null}
+ */
+export function clipboardOffer(text, isKnown) {
+  const source = normalizePasted(text).trim();
+  if (!source || source.length > 200) return null;
+  const pasted = parsePastedAmount(source, isKnown);
+  if (!pasted || !(pasted.value > 0)) return null;
+  const bareNumber = /^[\d\s.,'’]+$/.test(source) && source.length <= 20;
+  if (!pasted.currency && !bareNumber) return null;
+  const line = source.split('\n').map(part => part.trim()).find(part => /\d/.test(part)) ?? source;
+  return { ...pasted, excerpt: line.length > 32 ? `${line.slice(0, 31)}…` : line };
+}
+
+/** A short fingerprint of the clipboard, so that its text itself is never stored. */
+export function textFingerprint(text) {
+  let hash = 0x811c9dc5;
+  for (const ch of normalizePasted(text).trim()) {
+    hash ^= ch.codePointAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 /**

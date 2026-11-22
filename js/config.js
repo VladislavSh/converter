@@ -1,7 +1,7 @@
 // App-wide constants. APP_VERSION must match VERSION in sw.js and the ?v=
 // query in index.html (tests/project.test.js checks this).
 export const APP_NAME = 'CartRate';
-export const APP_VERSION = '1.17.0';
+export const APP_VERSION = '1.18.0';
 
 export const STORAGE_KEYS = Object.freeze({
   state: 'cartrate_state',
@@ -9,7 +9,8 @@ export const STORAGE_KEYS = Object.freeze({
   updatedFlag: 'cartrate_updated',
   retryFlag: 'cartrate_retry', // sessionStorage; also written by js/boot-guard.js
   banks: 'cartrate_banks',
-  installed: 'cartrate_installed' // the app was installed on this device: no "Install" in the browser
+  installed: 'cartrate_installed', // the app was installed on this device: no "Install" in the browser
+  clipboard: 'cartrate_clip' // a fingerprint of the clipboard text already offered (never the text)
 });
 
 // The only hosts the app talks to (see the Content-Security-Policy in index.html)

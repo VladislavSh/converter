@@ -3,6 +3,7 @@
 import { APP_NAME, APP_VERSION, RATE_SOURCES, STORAGE_KEYS } from '../config.js';
 import { APP_DISPLAY_MODES, INSTALL_STEPS, installPlatform, isInstalled, showInstallButton } from '../core/install.js';
 import { VIEWS } from '../core/state.js';
+import { stepView, swipeStep } from '../core/swipe.js';
 import { $, $$, createSheet } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
@@ -115,11 +116,45 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     onLanguageChange();
   });
   el.refresh.addEventListener('click', () => onRefresh());
-  el.tabs.forEach(tab => tab.addEventListener('click', () => {
-    setView(tab.dataset.view);
+  /** Opens a tab; it slides in from the side it is on. */
+  function goTo(view) {
+    if (view === app.state.view || !VIEWS.includes(view)) return;
+    const direction = Math.sign(VIEWS.indexOf(view) - VIEWS.indexOf(app.state.view));
+    setView(view);
+    const node = el.views[view];
+    node.classList.remove('view-enter-next', 'view-enter-prev');
+    void node.offsetWidth; // restart the animation
+    node.classList.add(direction > 0 ? 'view-enter-next' : 'view-enter-prev');
     app.save();
     onViewChange(app.state.view);
-  }));
+  }
+  el.tabs.forEach(tab => tab.addEventListener('click', () => goTo(tab.dataset.view)));
+
+  // Swiping the page left or right goes to the next or the previous tab. Not
+  // from places that scroll sideways or take text, not while the keypad is
+  // up, and not from the screen edges, where the system's back gesture is.
+  const NO_SWIPE = 'input, textarea, select, .src-tabs, .presets, .keypad, [data-no-swipe]';
+  const swipeArea = $('main');
+  let touch = null;
+  swipeArea.addEventListener('touchstart', event => {
+    const point = event.touches[0];
+    touch = event.touches.length === 1 && !event.target.closest(NO_SWIPE)
+      ? { x: point.clientX, y: point.clientY, time: event.timeStamp }
+      : null;
+  }, { passive: true });
+  swipeArea.addEventListener('touchend', event => {
+    if (!touch) return;
+    const point = event.changedTouches[0];
+    const step = swipeStep({
+      dx: point.clientX - touch.x, dy: point.clientY - touch.y, dt: event.timeStamp - touch.time,
+      startX: touch.x, width: window.innerWidth
+    });
+    touch = null;
+    if (!step || document.body.classList.contains('has-keypad') || String(getSelection?.() ?? '')) return;
+    const next = stepView(VIEWS, app.state.view, step);
+    if (next) goTo(next);
+  }, { passive: true });
+  swipeArea.addEventListener('touchcancel', () => { touch = null; }, { passive: true });
 
   // ---------- installing to the home screen ----------
   // Chrome, Edge and other Chromium browsers: the button opens the browser's
@@ -226,5 +261,5 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     }
   }));
 
-  return { applyTheme, applyTexts, setStatus, setView, setRefreshing, hideSplash };
+  return { applyTheme, applyTexts, setStatus, setView, goTo, setRefreshing, hideSplash };
 }

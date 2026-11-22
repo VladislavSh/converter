@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.17.0"></script>
-  <script src="js/boot-guard.js?v=1.17.0"></script>
-  <script src="js/install-early.js?v=1.17.0"></script>
+  <script src="js/theme-init.js?v=1.18.0"></script>
+  <script src="js/boot-guard.js?v=1.18.0"></script>
+  <script src="js/install-early.js?v=1.18.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.17.0">
+  <link rel="stylesheet" href="css/style.css?v=1.18.0">
 </head>
 <body>
 
@@ -86,6 +86,19 @@
       <span class="rate-bar__value" id="rate-bar-value"></span>
       <svg class="rate-bar__more" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
     </button>
+
+    <!-- An amount found in the clipboard, offered to paste (ui/clipboard-hint.js) -->
+    <div class="clip-hint" id="clip-hint" role="status" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6v3H9z"/><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg>
+      <span class="clip-hint__body">
+        <small id="clip-hint-from"></small>
+        <b id="clip-hint-value"></b>
+      </span>
+      <button type="button" class="clip-hint__apply" id="clip-hint-apply" data-i18n="paste">Вставить</button>
+      <button type="button" class="clip-hint__close" id="clip-hint-close" data-i18n-aria="clipHintHide" aria-label="Скрыть подсказку">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
 
     <!-- Converter: one amount in the source currency, shown in all the others -->
     <section class="conv" id="view-convert" role="tabpanel" aria-labelledby="tab-convert">
@@ -308,11 +321,6 @@
         </button>
       </div>
 
-      <button type="button" class="sum-bar" id="sh-sumbar" hidden data-i18n-aria="sumBarAria" aria-label="Показать расчёт">
-        <span class="sum-bar__main"><small id="sh-sumbar-label">Пополнить карту</small><b id="sh-sumbar-value">—</b></span>
-        <span class="sum-bar__side" id="sh-sumbar-side"></span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
-      </button>
       <p class="hint" data-i18n="shHint">Комиссия считается с каждой оплаты отдельно. Пополнение округлено вверх с запасом: курс Visa и банка может отличаться от рыночного.</p>
     </section>
 
@@ -353,6 +361,13 @@
       </button>
     </div>
   </main>
+
+  <!-- The total of the Purchase tab, kept in reach (ui/purchase.js) -->
+  <button type="button" class="sum-bar" id="sh-sumbar" hidden data-i18n-aria="sumBarAria" aria-label="Показать расчёт">
+    <span class="sum-bar__main"><small id="sh-sumbar-label">Пополнить карту</small><b id="sh-sumbar-value">—</b></span>
+    <span class="sum-bar__side" id="sh-sumbar-side"></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+  </button>
 
   <footer class="foot">
     <button type="button" class="chip" data-install hidden>
@@ -506,6 +521,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.17.0"></script>
+<script type="module" src="js/main.js?v=1.18.0"></script>
 </body>
 </html>

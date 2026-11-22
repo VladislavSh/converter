@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  applyPastedAmount, parseNumberToken, parsePastedAmount, pastedPrice, takeConverterAmount
+  applyPastedAmount, clipboardOffer, normalizePasted, parseNumberToken, parsePastedAmount, pastedPrice,
+  takeConverterAmount, textFingerprint
 } from '../js/core/pasted-amount.js';
 import { plainNumber } from '../js/core/format.js';
 import { convert } from '../js/core/rates.js';
@@ -194,4 +195,77 @@ test('nothing is carried over without a new, positive amount', () => {
     assert.equal(state.shop.price, '30');
     assert.equal(state.amountFresh, false);
   }
+});
+
+// ---------- non-standard ways of writing an amount ----------
+
+const any = text => parsePastedAmount(text); // every currency the parser knows
+
+test('roubles written every way people write them', () => {
+  for (const text of ['1500 руб', '1500 руб.', '1 500 рублей', '1500 RUB', '1500 rub', 'RUB 1500', '1500RUB', '1500р', '1500 р.', '₽1500', '1500 rubles']) {
+    assert.deepEqual(any(text), { value: 1500, currency: 'RUB' }, `"${text}"`);
+  }
+  assert.equal(any('рубеж 100').currency, null, '"рубеж" is not "руб"');
+  assert.equal(any('100 рыба').currency, null, 'a word starting with "р" is not roubles');
+  assert.deepEqual(any('500 бел. руб.'), { value: 500, currency: 'BYN' }, 'Belarusian roubles are their own');
+});
+
+test('thousands and millions in words, "к" and the Chinese 万', () => {
+  const cases = [
+    ['15 тыс. сум', 15000, 'UZS'], ['15 тысяч сум', 15000, 'UZS'], ['1,2 млн сум', 1200000, 'UZS'],
+    ['2 миллиона сумов', 2000000, 'UZS'], ["120 ming so'm", 120000, 'UZS'], ['15к руб', 15000, 'RUB'],
+    ['15k ₽', 15000, 'RUB'], ['1.2万元', 12000, 'CNY'], ['3 млрд сум', 3e9, 'UZS'], ['2.5k $', 2500, 'USD']
+  ];
+  for (const [text, value, currency] of cases) assert.deepEqual(any(text), { value, currency }, `"${text}"`);
+  assert.deepEqual(any('15 кг'), { value: 15, currency: null }, '"кг" is kilograms, not thousands');
+  assert.deepEqual(any('5 км'), { value: 5, currency: null });
+});
+
+test('full-width digits, odd spaces and codes glued to the number', () => {
+  assert.deepEqual(any('￥１２９９'), { value: 1299, currency: 'CNY' }, 'full-width, as Chinese sites copy them');
+  assert.deepEqual(any('＄１２．９９'), { value: 12.99, currency: 'USD' });
+  assert.deepEqual(any('12 990 сум'), { value: 12990, currency: 'UZS' }, 'thin and no-break spaces');
+  assert.deepEqual(any('1 299,50 €'), { value: 1299.5, currency: 'EUR' });
+  assert.deepEqual(any('5.99USD'), { value: 5.99, currency: 'USD' });
+  assert.deepEqual(any('USD5.99'), { value: 5.99, currency: 'USD' });
+  assert.deepEqual(any('1 299,- ₽'), { value: 1299, currency: 'RUB' }, 'a dash for no kopecks');
+  assert.deepEqual(any('​¥45‍'), { value: 45, currency: 'CNY' }, 'invisible characters');
+  assert.equal(normalizePasted('１２ ３'), '12 3');
+});
+
+test('the currencies of the region and their signs', () => {
+  const cases = [
+    ['5 000 тенге', 'KZT'], ['5000₸', 'KZT'], ['5000 тг', 'KZT'], ['300 грн', 'UAH'], ['300₴', 'UAH'],
+    ['50 лари', 'GEL'], ['50₾', 'GEL'], ['2000 драм', 'AMD'], ['20 манат', 'AZN'], ['20₼', 'AZN'],
+    ['1000 сом', 'KGS'], ['100 сомони', 'TJS'], ['100 дирхам', 'AED'], ['500 лир', 'TRY'], ['500₺', 'TRY'],
+    ['10 000 вон', 'KRW'], ['1000 иен', 'JPY'], ['1000円', 'JPY'], ['20 фунтов', 'GBP'], ['300 бат', 'THB'],
+    ['50 злотых', 'PLN'], ['50 zł', 'PLN'], ['100 франков', 'CHF'], ['15 баксов', 'USD'], ['88块', 'CNY']
+  ];
+  for (const [text, currency] of cases) assert.equal(any(text)?.currency, currency, `"${text}"`);
+  assert.equal(any('2 so‘m').currency, 'UZS', 'Uzbek Latin with a typographic apostrophe');
+});
+
+// ---------- offering what is in the clipboard ----------
+
+test('the clipboard is offered when it holds a price, with the line it came from', () => {
+  assert.deepEqual(clipboardOffer('¥1,299.00', hasRate), { value: 1299, currency: 'CNY', excerpt: '¥1,299.00' });
+  assert.deepEqual(clipboardOffer('  12 990,50  ', hasRate), { value: 12990.5, currency: null, excerpt: '12 990,50' }, 'a bare number');
+  const card = clipboardOffer('Кроссовки беговые\nЦена: 1 500 руб.\nДоставка завтра', hasRate);
+  assert.deepEqual([card.value, card.currency, card.excerpt], [1500, 'RUB', 'Цена: 1 500 руб.'], 'the line with the number');
+  const long = clipboardOffer(`Очень длинное описание товара со скидкой ${'x'.repeat(20)} ¥99`, hasRate);
+  assert.ok(long.excerpt.length <= 32 && long.excerpt.endsWith('…'), long.excerpt);
+});
+
+test('phone numbers, dates, order numbers and plain text are not offered', () => {
+  for (const text of ['+998 90 123 45 67', '22.11.2026', 'Заказ №123456', 'привет', '', '   ', 'https://example.com/item/12345', '0', `${'a'.repeat(300)} ¥5`]) {
+    assert.equal(clipboardOffer(text, hasRate), null, JSON.stringify(text.slice(0, 30)));
+  }
+});
+
+test('the clipboard is remembered by a fingerprint, never by its text', () => {
+  const print = textFingerprint('¥1,299.00');
+  assert.match(print, /^[0-9a-z]+$/);
+  assert.equal(print.includes('1299'), false);
+  assert.equal(textFingerprint(' ¥1,299.00 '), print, 'surrounding spaces do not matter');
+  assert.notEqual(textFingerprint('¥1,299.01'), print);
 });

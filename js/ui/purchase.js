@@ -362,6 +362,7 @@ export function createPurchaseView(app, { keypad }) {
 
   el.paste.addEventListener('click', async () => {
     const text = await readClipboardText();
+    app.markClipboard(text);
     if (text == null) {
       app.toast(app.t('pasteDenied'));
       el.price.focus();
@@ -375,6 +376,7 @@ export function createPurchaseView(app, { keypad }) {
   // The system paste (long press, Ctrl+V) goes through the same parser
   el.price.addEventListener('paste', event => {
     const text = event.clipboardData?.getData('text') ?? '';
+    app.markClipboard(text);
     const pasted = parsePastedAmount(text, hasRate);
     // A calculation ("89.9*2") is pasted as typed; the input handler cleans it up
     if (!pasted || (!pasted.currency && isExpression(text.trim()))) return;
@@ -431,5 +433,5 @@ export function createPurchaseView(app, { keypad }) {
   });
   el.dlBig.addEventListener('change', () => { shop().dlBig = el.dlBig.checked; changed(); });
 
-  return { render, takeAmount };
+  return { render, takeAmount, applyPasted: replacePrice };
 }
