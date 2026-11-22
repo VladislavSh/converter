@@ -562,6 +562,8 @@ body[data-view="banks"] .rate-bar { display: none; }
 .bank__head .card__title { margin: 0 0 2px 2px; }
 .bank__head .link-btn { flex: none; text-decoration: none; }
 .bank__sub { margin: 0 2px; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+.src-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.src-head .link-btn { flex: none; text-decoration: none; }
 .bank__rates { list-style: none; margin: 6px 0 0; padding: 0; }
 .bank-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px;

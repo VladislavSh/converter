@@ -12,7 +12,6 @@ import { $, $$, ICONS, createSheet, escapeHtml } from './dom.js';
 
 // Offered in the form besides the currencies of the main list
 const USUAL_CURRENCIES = ['USD', 'CNY', 'RUB', 'EUR', 'KZT', 'UZS'];
-const BANK_NAMES = { cbu: 'bankCbu', nbu: 'bankNbuSell' };
 const ERROR_TEXTS = {
   quote: 'srcQuoteError', pair: 'srcPairError', duplicate: 'srcDupError',
   rate: 'rateValueError', empty: 'srcEmptyError', full: 'srcFullError'
@@ -42,11 +41,7 @@ export function createRatesView(app, { onChange }) {
   const own = () => app.state.sources;
   const hasRate = code => app.marketConvert(1, 'USD', code) != null;
 
-  function sourceName(id) {
-    if (id === 'market') return app.t('rateMarket');
-    if (BANK_SOURCES.includes(id)) return app.t(BANK_NAMES[id]);
-    return own().find(source => source.id === id)?.name ?? '';
-  }
+  const sourceName = id => app.sourceName(id);
 
   /** "Official rates for 21.11.2026", "Loading…" or "Not loaded". */
   function bankNote(bank) {
@@ -88,7 +83,7 @@ export function createRatesView(app, { onChange }) {
 
   function renderList() {
     el.list.innerHTML = [
-      itemHtml({ id: 'market', name: app.t('rateMarket'), note: app.t('rateMarketNote') }),
+      itemHtml({ id: 'market', name: sourceName('market'), note: app.t('rateMarketNote') }),
       ...BANK_SOURCES.map(bank => itemHtml({ id: bank, name: sourceName(bank), note: bankNote(bank) })),
       ...own().map(source => itemHtml({
         id: source.id, name: source.name, note: sourceSummary(source, app.locale(), 3), editable: true
@@ -286,5 +281,17 @@ export function createRatesView(app, { onChange }) {
     if (sheet.isOpen() && el.form.hidden) renderList();
   }
 
-  return { render };
+  /** Opens the sheet on the form: a new source, or one to change (from the Rates tab). */
+  function openNewSource() {
+    sheet.open();
+    showForm();
+  }
+  function openSource(id) {
+    const source = own().find(item => item.id === id);
+    if (!source) return;
+    sheet.open();
+    showForm(source);
+  }
+
+  return { render, add: openNewSource, edit: openSource };
 }

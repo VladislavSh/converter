@@ -1,6 +1,6 @@
 // Entry point: builds the state, creates the views and keeps every rate source
 // fresh — the market rates and both banks, on start and on every refresh.
-import { APP_VERSION, STORAGE_KEYS, TIMING } from './config.js';
+import { APP_VERSION, RATE_SOURCES, STORAGE_KEYS, TIMING } from './config.js';
 import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
@@ -70,11 +70,18 @@ const app = {
   marketConvert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
   /** The source in use: {id, kind, source, missing}. */
   rateSource: () => resolveSource(state, banks),
+  /** What a source is called: the market one by the service it comes from. */
+  sourceName: id => {
+    if (id === 'market') return snapshot?.source || RATE_SOURCES.fiatPrimary.name;
+    if (id === 'cbu') return t('bankCbu');
+    if (id === 'nbu') return t('bankNbuSell');
+    return state.sources.find(source => source.id === id)?.name ?? '';
+  },
   /** One line for a shared calculation, when its numbers are not the market ones. */
   rateNote: () => {
     const { kind, id, source, missing } = resolveSource(state, banks);
     if (kind === 'market' || missing) return null;
-    if (kind === 'bank') return t('shareSourceBank', { name: t(id === 'cbu' ? 'bankCbu' : 'bankNbuSell'), date: source.date });
+    if (kind === 'bank') return t('shareSourceBank', { name: app.sourceName(id), date: source.date });
     return t('shareSourceOwn', { name: source.name, rates: sourceSummary(source, localeOf(state.lang), 3) });
   },
   save: () => {
@@ -107,7 +114,11 @@ const picker = createPickerView(app, { onListChange: () => converter.render() })
 const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
 const purchase = createPurchaseView(app, { keypad });
 const rateSources = createRatesView(app, { onChange: renderAll });
-const bankView = createBanksView(app, { onSourceChange: renderAll });
+const bankView = createBanksView(app, {
+  onSourceChange: renderAll,
+  onAddSource: () => rateSources.add(),
+  onEditSource: id => rateSources.edit(id)
+});
 
 function renderAll() {
   converter.render();
