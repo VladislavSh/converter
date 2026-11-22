@@ -6,7 +6,7 @@ import { switchSource } from '../core/currency-list.js';
 import { applyPastedAmount, parsePastedAmount } from '../core/pasted-amount.js';
 import { converterShareText } from '../core/share-text.js';
 import { badgeHtml } from './badge.js';
-import { $, $$, ICONS, copyText, escapeHtml, readClipboardText, replayAnimation } from './dom.js';
+import { $, $$, ICONS, copyText, escapeHtml, replayAnimation, setTicking } from './dom.js';
 
 // Long amounts get a smaller type size instead of being cut off: [max length, size]
 const HERO_SIZES = [[7, 'xl'], [10, 'l'], [14, 'm'], [Infinity, 's']];
@@ -19,7 +19,6 @@ export function createConverterView(app, { onEditList, keypad }) {
     tabs: $('#src-tabs'),
     name: $('#src-name'),
     input: $('#amount'),
-    paste: $('#amount-paste'),
     expr: $('#amount-expr'),
     results: $('#results'),
     edit: $('#manage-btn'),
@@ -39,10 +38,10 @@ export function createConverterView(app, { onEditList, keypad }) {
       : `1 ${base} = ${format(one, code)}`; // the row itself names the currency
   }
 
-  function resultHtml(code) {
+  function resultHtml(code, index = 0) {
     const { t } = app;
     return `
-      <li class="res" data-code="${code}">
+      <li class="res" data-code="${code}" style="--i:${index}">
         <button type="button" class="res__main" data-act="use" title="${escapeHtml(t('useAsSource', { code }))}">
           ${badgeHtml(code)}
           <span class="res__body">
@@ -69,6 +68,7 @@ export function createConverterView(app, { onEditList, keypad }) {
     el.results.innerHTML = targets.length
       ? targets.map(resultHtml).join('')
       : `<li class="results__empty">${escapeHtml(t('needSecond'))}</li>`;
+    replayAnimation(el.results, 'is-built'); // the rows rise in, one after another
 
     el.name.textContent = currencyName(state.base, state.lang);
     el.input.setAttribute('aria-label', t('amountLabel', { code: state.base }));
@@ -99,7 +99,7 @@ export function createConverterView(app, { onEditList, keypad }) {
       const code = row.dataset.code;
       const converted = value == null ? null : app.convert(value, state.base, code);
       const text = converted == null ? '—' : format(converted, code);
-      $('[data-role="value"]', row).textContent = text;
+      setTicking($('[data-role="value"]', row), text);
       $('.res__value', row).dataset.size = sizeFor(text.length + code.length, RESULT_SIZES);
       $('[data-role="rate"]', row).textContent = rateText(code);
     }
@@ -193,19 +193,6 @@ export function createConverterView(app, { onEditList, keypad }) {
     const { base } = app.state;
     app.toast(app.t('pasted', { text: `${format(pasted.value, base)} ${base}` }));
   }
-
-  el.paste.addEventListener('click', async () => {
-    const text = await readClipboardText();
-    app.markClipboard(text);
-    if (text == null) {
-      app.toast(app.t('pasteDenied'));
-      el.input.focus();
-      return;
-    }
-    const pasted = parsePastedAmount(text, hasRate);
-    if (pasted) replaceWithPasted(pasted);
-    else app.toast(app.t('pasteEmpty'));
-  });
 
   // The system paste (long press, Ctrl+V) goes through the same parser
   el.input.addEventListener('paste', event => {

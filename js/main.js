@@ -216,7 +216,8 @@ function dismissSplash() {
   const wait = Math.max(0, TIMING.splashMinMs - (performance.now() - startedAt));
   setTimeout(() => {
     shell.hideSplash();
-    document.body.classList.add('is-ready');
+    document.body.classList.add('is-ready', 'is-entering'); // the cards rise in, one after another
+    setTimeout(() => document.body.classList.remove('is-entering'), TIMING.enterMs);
     clearSessionFlag(STORAGE_KEYS.retryFlag); // the app started: js/boot-guard.js may retry again next time
   }, wait);
 }

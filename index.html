@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.18.0"></script>
-  <script src="js/boot-guard.js?v=1.18.0"></script>
-  <script src="js/install-early.js?v=1.18.0"></script>
+  <script src="js/theme-init.js?v=1.19.0"></script>
+  <script src="js/boot-guard.js?v=1.19.0"></script>
+  <script src="js/install-early.js?v=1.19.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.18.0">
+  <link rel="stylesheet" href="css/style.css?v=1.19.0">
 </head>
 <body>
 
@@ -94,7 +94,7 @@
         <small id="clip-hint-from"></small>
         <b id="clip-hint-value"></b>
       </span>
-      <button type="button" class="clip-hint__apply" id="clip-hint-apply" data-i18n="paste">Вставить</button>
+      <button type="button" class="clip-hint__apply" id="clip-hint-apply">Вставить</button>
       <button type="button" class="clip-hint__close" id="clip-hint-close" data-i18n-aria="clipHintHide" aria-label="Скрыть подсказку">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -106,10 +106,6 @@
         <div class="src-tabs" id="src-tabs" role="radiogroup" data-i18n-aria="sourceLabel" aria-label="Валюта суммы"></div>
         <div class="hero__head">
           <label class="hero__name" id="src-name" for="amount"></label>
-          <button type="button" class="hero__paste" id="amount-paste" data-i18n-aria="pasteAmount" aria-label="Вставить сумму из буфера">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6v3H9z"/><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg>
-            <span data-i18n="paste">Вставить</span>
-          </button>
         </div>
         <input class="hero__input" id="amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="0">
         <div class="hero__expr" id="amount-expr" aria-live="polite"></div>
@@ -136,10 +132,6 @@
         <div class="field">
           <div class="field__head">
             <label for="sh-price" data-i18n="shPrice">Цена товара</label>
-            <button type="button" class="link-btn" id="sh-paste" data-i18n-aria="pasteAmount" aria-label="Вставить сумму из буфера">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6v3H9z"/><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg>
-              <span data-i18n="paste">Вставить</span>
-            </button>
           </div>
           <div class="field__row">
             <input id="sh-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0">
@@ -521,6 +513,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.18.0"></script>
+<script type="module" src="js/main.js?v=1.19.0"></script>
 </body>
 </html>

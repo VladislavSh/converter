@@ -1,7 +1,7 @@
 // Offline support. Only same-origin files are cached; the rate APIs always go
 // to the network (the app keeps the last rates itself). No third-party hosts.
 const PREFIX = 'cartrate-';
-const VERSION = `${PREFIX}1.18.0`; // keep in sync with APP_VERSION in js/config.js
+const VERSION = `${PREFIX}1.19.0`; // keep in sync with APP_VERSION in js/config.js
 const FLAGS = `${PREFIX}flags`; // flag images never change, so this cache survives releases
 const SHELL = [
   './',

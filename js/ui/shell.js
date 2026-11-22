@@ -15,6 +15,7 @@ const PROMPT_WAIT_MS = 3000;
 
 export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) {
   const el = {
+    nav: $('.views'),
     splash: $('#splash'),
     metaTheme: $('#meta-theme'),
     theme: $('#theme-btn'),
@@ -86,6 +87,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   function setView(view) {
     app.state.view = VIEWS.includes(view) ? view : 'convert';
     document.body.dataset.view = app.state.view; // the Banks tab hides the "Rate" bar
+    el.nav.style.setProperty('--tab-index', String(VIEWS.indexOf(app.state.view))); // the pill slides there
     el.tabs.forEach(tab => {
       const active = tab.dataset.view === app.state.view;
       tab.classList.toggle('is-active', active);

@@ -109,6 +109,17 @@ export async function shareText(text) {
   return (await copyText(text)) ? 'copied' : 'failed';
 }
 
+/**
+ * Puts new text into an element; when the text really changed, the element
+ * gives a short "tick" (core of the number animations). Same text: nothing moves.
+ */
+export function setTicking(element, text) {
+  if (element.textContent === text) return;
+  const had = element.textContent !== '';
+  element.textContent = text;
+  if (had) replayAnimation(element, 'is-tick');
+}
+
 /** Restarts a CSS animation tied to a class. */
 export function replayAnimation(element, className) {
   element.classList.remove(className);

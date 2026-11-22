@@ -23,6 +23,8 @@
   --radius: 22px;
   --radius-sm: 14px;
   --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.32, .72, 0, 1); /* sheets, tabs: fast start, soft landing */
+  --pop: cubic-bezier(.34, 1.56, .64, 1); /* small things that appear: a slight overshoot */
   --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -138,16 +140,22 @@ h1, h2, p { margin: 0; }
 /* ---------- View tabs ---------- */
 /* The tabs stay at hand while a long form scrolls under them */
 .views {
-  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 20;
+  position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 20; --tab-index: 0;
   display: flex; gap: 4px; padding: 4px; margin-bottom: 14px;
   border-radius: 18px; background: var(--bar-bg); border: 1px solid var(--card-border);
   -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
 }
-.view-tab {
-  flex: 1; min-height: 42px; padding: 0 12px; border-radius: 14px; font-weight: 700; font-size: 14px;
-  color: var(--text-2); transition: color .2s, background .25s var(--ease);
+.views::before {
+  content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 16px) / 3);
+  border-radius: 14px; background: var(--tab-active); box-shadow: 0 2px 10px -4px rgba(0, 0, 0, .35);
+  transform: translateX(calc(var(--tab-index) * (100% + 4px))); transition: transform .5s var(--spring);
 }
-.view-tab.is-active { color: var(--text); background: var(--tab-active); box-shadow: 0 2px 10px -4px rgba(0, 0, 0, .35); }
+.view-tab {
+  position: relative; z-index: 1; flex: 1; min-height: 42px; padding: 0 12px; border-radius: 14px;
+  font-weight: 700; font-size: 14px; color: var(--text-2); transition: color .3s var(--ease), transform .15s var(--ease);
+}
+.view-tab:active { transform: scale(.96); }
+.view-tab.is-active { color: var(--text); }
 
 /* ---------- Currency badge ---------- */
 .badge {
@@ -453,7 +461,7 @@ h1, h2, p { margin: 0; }
   background: var(--sheet); border-radius: 28px 28px 0 0;
   border: 1px solid var(--card-border); border-bottom: 0;
   padding: 8px 16px 0; transform: translate(-50%, 100%);
-  transition: transform .45s var(--ease);
+  transition: transform .5s var(--spring);
   box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, .5);
 }
 .sheet.is-open .sheet__panel { transform: translate(-50%, 0); }
@@ -677,11 +685,12 @@ body.has-keypad .sum-bar { display: none; }
 
 /* ---------- An amount found in the clipboard ---------- */
 .clip-hint {
+  transform-origin: top center;
   display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 8px 6px 8px 14px;
   border-radius: 16px; background: rgba(124, 92, 255, .12); border: 1px solid rgba(124, 92, 255, .35);
-  animation: clip-in .3s var(--ease);
+  animation: clip-in .5s var(--pop);
 }
-@keyframes clip-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes clip-in { from { opacity: 0; transform: translateY(-10px) scale(.96); } }
 .clip-hint > svg { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--link); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .clip-hint__body { flex: 1; min-width: 0; display: grid; }
 .clip-hint__body small, .clip-hint__body b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -695,10 +704,42 @@ body.has-keypad .sum-bar { display: none; }
 body[data-view="banks"] .clip-hint { display: none; }
 
 /* ---------- Switching tabs: the new one slides in from its side ---------- */
-.view-enter-next { animation: view-in-next .28s var(--ease); }
-.view-enter-prev { animation: view-in-prev .28s var(--ease); }
-@keyframes view-in-next { from { opacity: 0; transform: translateX(28px); } }
-@keyframes view-in-prev { from { opacity: 0; transform: translateX(-28px); } }
+.view-enter-next { animation: view-in-next .45s var(--spring); }
+.view-enter-prev { animation: view-in-prev .45s var(--spring); }
+@keyframes view-in-next { from { opacity: 0; transform: translateX(40px) scale(.985); } }
+@keyframes view-in-prev { from { opacity: 0; transform: translateX(-40px) scale(.985); } }
+
+/* ---------- Motion: numbers, lists, the first look, presses ---------- */
+/* A number that changed ticks up into place */
+.is-tick { display: inline-block; animation: tick .38s var(--spring); }
+@keyframes tick { from { opacity: .25; transform: translateY(.35em); } }
+
+/* Result rows rise in one after another when the list is built */
+.results.is-built .res { animation: rise-in .5s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes rise-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+
+/* After the splash, the page rises in block by block */
+.is-entering .topbar, .is-entering .views, .is-entering .rate-bar,
+.is-entering main > section:not([hidden]) > * { animation: rise-in .65s var(--spring) both; }
+.is-entering .views { animation-delay: .04s; }
+.is-entering .rate-bar { animation-delay: .08s; }
+.is-entering main > section:not([hidden]) > :nth-child(1) { animation-delay: .12s; }
+.is-entering main > section:not([hidden]) > :nth-child(2) { animation-delay: .17s; }
+.is-entering main > section:not([hidden]) > :nth-child(3) { animation-delay: .22s; }
+.is-entering main > section:not([hidden]) > :nth-child(4) { animation-delay: .27s; }
+.is-entering main > section:not([hidden]) > :nth-child(n+5) { animation-delay: .32s; }
+
+/* Presses: everything tappable answers the finger */
+.method, .presets button, .seg button, .rate-item__main, .src-picker, .src-tab, .pick, .chip, .link-btn, .fold__head {
+  transition: transform .15s var(--ease), background .2s, border-color .2s, color .2s;
+}
+.method:active, .presets button:active, .seg button:active, .chip:active, .src-tab:active { transform: scale(.96); }
+.rate-item__main:active, .pick:active, .fold__head:active { transform: scale(.985); }
+.link-btn:active { transform: scale(.95); }
+
+/* The total of the purchase pops a little when it changes */
+#sh-topup.is-tick { animation: tick-pop .45s var(--pop); }
+@keyframes tick-pop { 0% { opacity: .3; transform: translateY(.3em) scale(.96); } 60% { opacity: 1; transform: translateY(0) scale(1.04); } }
 body:not([data-view="shop"]) .sum-bar { display: none; }
 
 /* ---------- Calculator keypad ---------- */
@@ -746,7 +787,7 @@ body.has-keypad .toast { bottom: calc(var(--keypad-h, 380px) + 12px); }
   transform: translate(-50%, 30px); opacity: 0; pointer-events: none;
   padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600;
   background: var(--text); color: var(--bg); box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .5);
-  transition: transform .35s var(--ease), opacity .35s var(--ease);
+  transition: transform .45s var(--pop), opacity .3s var(--ease);
   max-width: calc(100% - 32px); text-align: center;
 }
 .toast.is-show { transform: translate(-50%, 0); opacity: 1; }

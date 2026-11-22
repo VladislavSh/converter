@@ -5,14 +5,13 @@ import { formatMoney, formatNumber, plainNumber } from '../core/format.js';
 import { parsePastedAmount, pastedPrice, takeConverterAmount } from '../core/pasted-amount.js';
 import { calcPurchase, parseNumber } from '../core/purchase.js';
 import { breakdownLines, purchaseShareText } from '../core/share-text.js';
-import { $, $$, copyText, escapeHtml, readClipboardText } from './dom.js';
+import { $, $$, copyText, escapeHtml, setTicking } from './dom.js';
 
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
 
 export function createPurchaseView(app, { keypad }) {
   const el = {
     price: $('#sh-price'),
-    paste: $('#sh-paste'),
     copy: $('#sh-copy'),
     share: $('#sh-share'),
     currency: $('#sh-cur'),
@@ -204,7 +203,7 @@ export function createPurchaseView(app, { keypad }) {
       .join('');
     el.share.hidden = !r.hasTopup && !(r.delivery.cost > 0);
 
-    el.topup.textContent = r.hasTopup ? `${money(r.topup, card)} ${card}` : '—';
+    setTicking(el.topup, r.hasTopup ? `${money(r.topup, card)} ${card}` : '—');
     el.copy.hidden = !r.hasTopup;
     el.alt.textContent = r.topupAlt == null ? '' : `≈ ${money(r.topupAlt, r.altCurrency)} ${r.altCurrency}`;
 
@@ -267,13 +266,13 @@ export function createPurchaseView(app, { keypad }) {
     sumBarWanted = r.hasTopup || r.delivery.cost > 0;
     if (r.hasTopup) {
       el.sumBarLabel.textContent = t('shTopup');
-      el.sumBarValue.textContent = `${money(r.topup, r.card)} ${r.card}`;
+      setTicking(el.sumBarValue, `${money(r.topup, r.card)} ${r.card}`);
       el.sumBarSide.textContent = r.summary?.showParts
         ? t('sumBarTotal', { v: `${money(r.summary.needUsd, 'USD')} USD` })
         : (r.topupAlt == null ? '' : `≈ ${money(r.topupAlt, r.altCurrency)} ${r.altCurrency}`);
     } else if (r.summary) {
       el.sumBarLabel.textContent = t('sumTotal');
-      el.sumBarValue.textContent = `${money(r.summary.needUsd, 'USD')} USD`;
+      setTicking(el.sumBarValue, `${money(r.summary.needUsd, 'USD')} USD`);
       el.sumBarSide.textContent = r.summary.needUzs == null ? '' : `≈ ${money(r.summary.needUzs, 'UZS')} UZS`;
     }
     updateSumBar();
@@ -359,19 +358,6 @@ export function createPurchaseView(app, { keypad }) {
     const taken = takeConverterAmount(app.state, app.convert);
     if (taken) showNewPrice(taken, taken.value, 'carried', 'carriedConverted');
   }
-
-  el.paste.addEventListener('click', async () => {
-    const text = await readClipboardText();
-    app.markClipboard(text);
-    if (text == null) {
-      app.toast(app.t('pasteDenied'));
-      el.price.focus();
-      return;
-    }
-    const pasted = parsePastedAmount(text, hasRate);
-    if (pasted) replacePrice(pasted);
-    else app.toast(app.t('pasteEmpty'));
-  });
 
   // The system paste (long press, Ctrl+V) goes through the same parser
   el.price.addEventListener('paste', event => {
