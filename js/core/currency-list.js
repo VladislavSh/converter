@@ -9,8 +9,12 @@ import { isCurrencyCode } from './rates.js';
  * USD → UZS turns "100" into its UZS equivalent.
  * @returns {boolean} true when the source changed
  */
-export function switchSource(state, code, convert) {
+export function switchSource(state, code, convert, { keepAmount = false } = {}) {
   if (code === state.base || !state.list.includes(code)) return false;
+  if (keepAmount) { // the same number, now in another currency
+    state.base = code;
+    return true;
+  }
   const value = evaluate(state.input);
   const converted = value == null ? null : convert(value, state.base, code);
   state.base = code;

@@ -215,3 +215,13 @@ test('delivery starts switched off on every start, a link with delivery switches
   assert.equal(state.shop.dlOn, true);
   assert.equal(state.shop.dlWeight, '2');
 });
+
+test('switchSource with keepAmount changes only the currency', () => {
+  const state = { list: ['USD', 'CNY', 'UZS'], base: 'USD', input: '100' };
+  assert.equal(switchSource(state, 'UZS', cv, { keepAmount: true }), true);
+  assert.deepEqual([state.base, state.input], ['UZS', '100']);
+  const expr = { list: ['USD', 'CNY'], base: 'USD', input: '10*2' };
+  switchSource(expr, 'CNY', cv, { keepAmount: true });
+  assert.deepEqual([expr.base, expr.input], ['CNY', '10*2'], 'an expression stays as typed');
+  assert.equal(switchSource(expr, 'CNY', cv, { keepAmount: true }), false, 'already the source');
+});

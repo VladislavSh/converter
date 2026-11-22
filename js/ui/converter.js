@@ -116,8 +116,9 @@ export function createConverterView(app, { onEditList, keypad }) {
     revealActiveTab(); // also after the tab was hidden while the chips were built
   }
 
-  function setSource(code) {
-    if (!switchSource(app.state, code, app.convert)) return;
+  /** @param {{keepAmount?: boolean}} [options] keepAmount: only the currency changes (the chips) */
+  function setSource(code, options) {
+    if (!switchSource(app.state, code, app.convert, options)) return;
     app.save();
     if (document.activeElement === el.input) el.input.value = app.state.input;
     render();
@@ -139,10 +140,12 @@ export function createConverterView(app, { onEditList, keypad }) {
   }
 
   // --- source currency chips (a radio group: arrows move the selection) ---
+  // A chip changes only the currency of the amount: «100» stays 100, now in
+  // another currency. A tap on a result row converts the amount instead.
   el.tabs.addEventListener('click', event => {
     const tab = event.target.closest('.src-tab');
     if (!tab) return;
-    setSource(tab.dataset.code);
+    setSource(tab.dataset.code, { keepAmount: true });
     focusActiveTab();
   });
   el.tabs.addEventListener('keydown', event => {
@@ -150,7 +153,7 @@ export function createConverterView(app, { onEditList, keypad }) {
     if (!step) return;
     event.preventDefault();
     const { list, base } = app.state;
-    setSource(list[(list.indexOf(base) + step + list.length) % list.length]);
+    setSource(list[(list.indexOf(base) + step + list.length) % list.length], { keepAmount: true });
     focusActiveTab();
   });
 
