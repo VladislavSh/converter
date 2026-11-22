@@ -245,3 +245,17 @@ test('nothing is evaluated as code and no tracker is included', () => {
 test('scripts stay inside the js folder tree', () => {
   for (const file of jsFiles) assert.ok(!relative('js', file).startsWith('..'));
 });
+
+test('the stylesheet has balanced braces (one stray "}" drops every rule after it)', () => {
+  const css = walk('css').map(file => read(file)).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '') // comments
+    .replace(/"[^"]*"|'[^']*'/g, ''); // strings
+  let depth = 0;
+  for (const [index, line] of css.split('\n').entries()) {
+    for (const ch of line) {
+      depth += ch === '{' ? 1 : ch === '}' ? -1 : 0;
+      assert.ok(depth >= 0, `an extra "}" near line ${index + 1} of the stylesheet (comments stripped)`);
+    }
+  }
+  assert.equal(depth, 0, 'every "{" is closed');
+});

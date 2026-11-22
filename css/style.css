@@ -586,7 +586,6 @@ span.bank__use svg { width: 16px; height: 16px; fill: none; stroke: currentColor
   .bank-row--pair { grid-template-columns: minmax(0, 1fr) 76px 76px; }
   .bank-row--pair .badge { display: none; }
 }
-}
 
 /* ---------- Calculator keypad ---------- */
 .keypad {
