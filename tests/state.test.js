@@ -1,0 +1,161 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildState, SHOP_DEFAULTS, STATE_VERSION } from '../js/core/state.js';
+import { moveCurrency, switchSource, toggleCurrency } from '../js/core/currency-list.js';
+import { convert } from '../js/core/rates.js';
+
+const TABLE = { USD: 1, CNY: 7, UZS: 12000, RUB: 80 };
+const cv = (value, from, to) => convert(TABLE, value, from, to);
+
+test('first launch: dollar, yuan, sum and rouble', () => {
+  const state = buildState(null);
+  assert.deepEqual(state.list, ['USD', 'CNY', 'UZS', 'RUB']);
+  assert.equal(state.base, 'USD');
+  assert.equal(state.input, '100');
+  assert.equal(state.view, 'convert');
+  assert.equal(state.v, STATE_VERSION);
+  assert.deepEqual(state.shop, { ...SHOP_DEFAULTS });
+});
+
+test('theme and language follow the device until the user chooses', () => {
+  assert.equal(buildState(null, { prefersLight: true }).theme, 'light');
+  assert.equal(buildState(null, { prefersLight: false }).theme, 'dark');
+  assert.equal(buildState(null, { language: 'uz-UZ' }).lang, 'ru');
+  assert.equal(buildState(null, { language: 'en-US' }).lang, 'en');
+  const chosen = buildState({ v: STATE_VERSION, theme: 'dark', lang: 'en' }, { prefersLight: true, language: 'ru' });
+  assert.equal(chosen.theme, 'dark');
+  assert.equal(chosen.lang, 'en');
+});
+
+test('a current state is restored as it was saved', () => {
+  const saved = {
+    v: STATE_VERSION, theme: 'light', lang: 'en', view: 'shop',
+    list: ['UZS', 'USD', 'KZT'], base: 'KZT', input: '120*3',
+    shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34', dlPayCard: true }
+  };
+  assert.deepEqual(buildState(structuredClone(saved)), saved);
+});
+
+test('upgrade to v7 drops EUR and BTC from the old default list', () => {
+  const state = buildState({ v: 6, list: ['USD', 'CNY', 'UZS', 'EUR', 'RUB', 'BTC'], base: 'EUR', input: '50' });
+  assert.deepEqual(state.list, ['USD', 'CNY', 'UZS', 'RUB']);
+  assert.equal(state.base, 'USD', 'the source moves to a currency that is still listed');
+  assert.equal(state.input, '100', '50 EUR must not silently become 50 USD');
+});
+
+test('upgrade to v7 keeps the amount when its currency stays', () => {
+  const state = buildState({ v: 6, list: ['USD', 'CNY', 'UZS', 'EUR', 'RUB', 'BTC'], base: 'UZS', input: '250000' });
+  assert.deepEqual([state.base, state.input], ['UZS', '250000']);
+});
+
+test('upgrade to v7 keeps currencies the user added themselves', () => {
+  const state = buildState({ v: 6, list: ['KZT', 'USD', 'EUR', 'TRY', 'BTC'], base: 'KZT' });
+  assert.deepEqual(state.list, ['USD', 'CNY', 'UZS', 'RUB', 'KZT', 'TRY']);
+  assert.equal(state.base, 'KZT');
+});
+
+test('older fee settings are migrated', () => {
+  const v2 = buildState({ v: 2, shop: { svcPct: '5', svcFix: '10', ship: '8', dlOn: true } });
+  assert.deepEqual([v2.shop.svcPct, v2.shop.freeBelow, v2.shop.svcMin], ['3', '200', '0']);
+  assert.equal(v2.shop.dlOn, false, 'delivery starts switched off');
+  assert.equal('svcFix' in v2.shop, false, 'retired fields are gone');
+  assert.equal('ship' in v2.shop, false);
+
+  const v5 = buildState({ v: 5, shop: { svcPct: '3', freeBelow: '0', svcMin: '2' } });
+  assert.deepEqual([v5.shop.freeBelow, v5.shop.svcMin], ['200', '0'], 'the wrong "min 2 ¥" preset is replaced');
+
+  const custom = buildState({ v: 5, shop: { svcPct: '4', freeBelow: '100', svcMin: '1' } });
+  assert.deepEqual([custom.shop.svcPct, custom.shop.freeBelow, custom.shop.svcMin], ['4', '100', '1'], 'own settings survive');
+});
+
+test('corrupted or hostile storage never reaches the app', () => {
+  const state = buildState({
+    v: STATE_VERSION,
+    theme: 'pink', lang: 'xx', view: '<script>',
+    list: ['USD', 'USD', '<img src=x onerror=alert(1)>', 'usd', 42, null, 'CNY'],
+    base: '"><b>',
+    input: { toString: () => 'x' },
+    shop: { price: ['1'], priceCur: 'XXX', card: 'BTC', dlOn: 'yes', dlMethod: 'rocket', dlUnit: 'lb', dlStep: '7', dlPayCard: 1, extra: 'x' }
+  });
+  assert.equal(state.theme, 'dark');
+  assert.equal(state.lang, 'ru');
+  assert.equal(state.view, 'convert');
+  assert.deepEqual(state.list, ['USD', 'CNY'], 'duplicates and junk codes are dropped');
+  assert.equal(state.base, 'USD');
+  assert.equal(state.input, '100');
+  assert.deepEqual(state.shop, { ...SHOP_DEFAULTS });
+});
+
+test('junk instead of a state object means a clean start', () => {
+  for (const junk of ['text', 42, [], true]) {
+    assert.deepEqual(buildState(junk).list, ['USD', 'CNY', 'UZS', 'RUB'], JSON.stringify(junk));
+  }
+  assert.deepEqual(buildState({ v: STATE_VERSION, list: [] }).list, ['USD', 'CNY', 'UZS', 'RUB'], 'an empty list is refilled');
+});
+
+test('long strings from storage are cut', () => {
+  const state = buildState({ v: STATE_VERSION, input: '9'.repeat(5000), shop: { price: '1'.repeat(5000) } });
+  assert.equal(state.input.length, 60);
+  assert.equal(state.shop.price.length, 60);
+});
+
+test('switchSource carries the amount into the new currency', () => {
+  const state = { list: ['USD', 'CNY', 'UZS'], base: 'USD', input: '100' };
+  assert.equal(switchSource(state, 'UZS', cv), true);
+  assert.deepEqual([state.base, state.input], ['UZS', '1200000']);
+  assert.equal(switchSource(state, 'USD', cv), true);
+  assert.deepEqual([state.base, state.input], ['USD', '100'], 'and back without drift');
+});
+
+test('switchSource: expressions, empty input and refusals', () => {
+  const expr = { list: ['USD', 'CNY'], base: 'USD', input: '10*2' };
+  switchSource(expr, 'CNY', cv);
+  assert.equal(expr.input, '140', 'the result of the expression is converted');
+
+  const empty = { list: ['USD', 'CNY'], base: 'USD', input: '' };
+  switchSource(empty, 'CNY', cv);
+  assert.deepEqual([empty.base, empty.input], ['CNY', '']);
+
+  const same = { list: ['USD', 'CNY'], base: 'USD', input: '5' };
+  assert.equal(switchSource(same, 'USD', cv), false, 'already the source');
+  assert.equal(switchSource(same, 'RUB', cv), false, 'not in the list');
+  assert.deepEqual(same, { list: ['USD', 'CNY'], base: 'USD', input: '5' });
+
+  const offline = { list: ['USD', 'CNY'], base: 'USD', input: '5' };
+  switchSource(offline, 'CNY', () => null);
+  assert.deepEqual([offline.base, offline.input], ['CNY', ''], 'no rate: the field is cleared, not left with a wrong number');
+});
+
+test('toggleCurrency adds, removes and never empties the list', () => {
+  const state = { list: ['USD', 'CNY'], base: 'USD', input: '100' };
+  assert.equal(toggleCurrency(state, 'RUB', cv), 'added');
+  assert.deepEqual(state.list, ['USD', 'CNY', 'RUB']);
+  assert.equal(toggleCurrency(state, 'CNY', cv), 'removed');
+  assert.deepEqual(state.list, ['USD', 'RUB']);
+  assert.equal(toggleCurrency(state, '<x>', cv), 'invalid');
+  assert.equal(toggleCurrency(state, 'RUB', cv), 'removed');
+  assert.equal(toggleCurrency(state, 'USD', cv), 'last');
+  assert.deepEqual(state.list, ['USD']);
+});
+
+test('removing the source currency hands the amount to a neighbour', () => {
+  const first = { list: ['USD', 'CNY', 'UZS'], base: 'USD', input: '100' };
+  assert.equal(toggleCurrency(first, 'USD', cv), 'removed');
+  assert.deepEqual(first, { list: ['CNY', 'UZS'], base: 'CNY', input: '700' });
+
+  const middle = { list: ['USD', 'CNY', 'UZS'], base: 'CNY', input: '700' };
+  toggleCurrency(middle, 'CNY', cv);
+  assert.deepEqual(middle, { list: ['USD', 'UZS'], base: 'USD', input: '100' });
+});
+
+test('moveCurrency reorders within bounds', () => {
+  const state = { list: ['USD', 'CNY', 'UZS'] };
+  assert.equal(moveCurrency(state, 'UZS', -1), true);
+  assert.deepEqual(state.list, ['USD', 'UZS', 'CNY']);
+  assert.equal(moveCurrency(state, 'USD', 1), true);
+  assert.deepEqual(state.list, ['UZS', 'USD', 'CNY']);
+  assert.equal(moveCurrency(state, 'UZS', -1), false, 'already first');
+  assert.equal(moveCurrency(state, 'CNY', 1), false, 'already last');
+  assert.equal(moveCurrency(state, 'RUB', 1), false, 'not in the list');
+  assert.deepEqual(state.list, ['UZS', 'USD', 'CNY']);
+});
