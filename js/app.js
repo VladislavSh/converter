@@ -27,6 +27,8 @@
       shBank: 'Комиссия банка, %', shBuf: 'Запас на курс, %', shCard: 'Карта',
       shGoods: 'Товар', shSvcLine: 'Комиссия оплаты', shOrder: 'Итого заказ',
       dlOff: 'Доставка не учитывается. Включите, чтобы посчитать.',
+      sumTopup: 'Пополнить карту', sumDelivery: 'Доставка iPost (оплата отдельно)', sumTotal: 'Всего понадобится',
+      sumNote: 'Точная стоимость ≈ {real}. Запас ≈ {left} нужен на случай, если курс будет хуже; не потратится — останется на карте.',
       dlOnlyTitle: 'Доставка iPost', dlOnlySub: 'оплачивается отдельно от товара',
       dlTitle: 'Доставка iPost', dlAir: 'Авиа', dlAuto: 'Авто', dlWeight: 'Вес посылки', dlG: 'г', dlKg: 'кг',
       dlAirRate: 'Авиа, $/кг', dlAutoRate: 'Авто, $/кг', dlStep: 'Округление',
@@ -62,6 +64,8 @@
       shBank: 'Bank fee, %', shBuf: 'Rate buffer, %', shCard: 'Card',
       shGoods: 'Items', shSvcLine: 'Payment fee', shOrder: 'Order total',
       dlOff: 'Delivery is not included. Turn it on to calculate.',
+      sumTopup: 'Top up card', sumDelivery: 'iPost delivery (paid separately)', sumTotal: 'Total needed',
+      sumNote: 'Exact cost ≈ {real}. The ≈ {left} buffer covers a worse rate; if unused it stays on the card.',
       dlOnlyTitle: 'iPost delivery', dlOnlySub: 'paid separately from the items',
       dlTitle: 'iPost delivery', dlAir: 'Air', dlAuto: 'Road', dlWeight: 'Parcel weight', dlG: 'g', dlKg: 'kg',
       dlAirRate: 'Air, $/kg', dlAutoRate: 'Road, $/kg', dlStep: 'Rounding',
@@ -84,8 +88,11 @@
   const state = {
     theme: saved.theme || document.documentElement.dataset.theme || 'dark',
     lang: saved.lang || (/^(ru|uk|be|kk|uz)/.test(navigator.language || 'ru') ? 'ru' : 'en'),
-    list: Array.isArray(saved.list) && saved.list.length ? saved.list : DEFAULT_LIST.slice(),
-    base: saved.base || 'USD',
+    list: (() => {
+      const l = Array.isArray(saved.list) ? [...new Set(saved.list.filter(c => typeof c === 'string' && /^[A-Z]{3,5}$/.test(c)))] : [];
+      return l.length ? l : DEFAULT_LIST.slice();
+    })(),
+    base: typeof saved.base === 'string' && /^[A-Z]{3,5}$/.test(saved.base) ? saved.base : 'USD',
     input: typeof saved.input === 'string' ? saved.input : '100'
   };
   state.view = saved.view === 'shop' ? 'shop' : 'convert';
@@ -118,6 +125,7 @@
   }
   state.v = 6;
   let rates = load(RATES_STORE); // { rates: {CODE: units per 1 USD}, ts, source }
+  if (!rates || typeof rates !== 'object' || !rates.rates || !Number.isFinite(rates.ts)) rates = null;
 
   const t = k => (I18N[state.lang] && I18N[state.lang][k]) || I18N.ru[k] || k;
   const locale = () => (state.lang === 'ru' ? 'ru-RU' : 'en-US');
@@ -194,8 +202,28 @@
     const sym = symbolOf(code);
     const mono = sym.length > 1 ? `<small>${esc(sym)}</small>` : esc(sym);
     const cc = FLAG_OVERRIDE[code] || (code[0] !== 'X' ? code.slice(0, 2).toLowerCase() : null);
-    if (!cc) return `<span class="badge" style="--badge:${bg}">${mono}</span>`;
-    return `<span class="badge" style="--badge:${bg}" data-mono="${esc(sym)}"><img src="https://flagcdn.com/w80/${cc}.png" alt="" loading="lazy" decoding="async" onerror="this.parentNode.innerHTML=this.parentNode.dataset.mono"></span>`;
+    if (!cc || !/^[a-z]{2}$/.test(cc)) return `<span class="badge" style="--badge:${bg}">${mono}</span>`;
+    // Self-hosted flag (flag-icons, MIT); falls back to the monogram via the error listener below
+    return `<span class="badge" style="--badge:${bg}" data-mono="${esc(sym)}"><img src="icons/flags/${cc}.svg" alt="" loading="lazy" decoding="async"></span>`;
+  }
+  // Missing flag → show the currency symbol instead (no inline onerror, CSP-friendly)
+  document.addEventListener('error', e => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && img.parentNode && img.parentNode.classList.contains('badge')) {
+      img.parentNode.textContent = img.parentNode.dataset.mono || '';
+    }
+  }, true);
+
+  // Anything coming from the network or storage is checked before it can reach the DOM
+  const CODE_RE = /^[A-Z]{3,5}$/;
+  const isCode = c => typeof c === 'string' && CODE_RE.test(c);
+  function cleanRates(obj) {
+    const out = {};
+    if (!obj || typeof obj !== 'object') return out;
+    for (const [k, v] of Object.entries(obj)) {
+      if (isCode(k) && typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v;
+    }
+    return out;
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
@@ -473,7 +501,8 @@
       row(t('shCharged'), `≈ ${fmt(charged, card)} ${card}`, true);
       if (goodsBuf + dlBuf > 0) row(`${t('shBufLine')} (${bufP}%)`, `+${fmt(goodsBuf + dlBuf, card)} ${card}`);
       sh.topup.textContent = `${fmt(topup, card)} ${card}`;
-      const altV = convert(charged, card, alt);
+      // the line under the big number shows the SAME top-up amount in the other currency
+      const altV = convert(topup, card, alt);
       sh.alt.textContent = (altV != null ? [`≈ ${fmt(altV, alt)} ${alt}`] : []).concat(rateBits).join(' · ');
     } else {
       // only delivery, paid separately: nothing to top up on the card
@@ -482,15 +511,30 @@
     }
     sh.rows.innerHTML = rows.join('');
 
-    // Whole purchase incl. delivery paid separately
-    if (dl.cost > 0 && !dlInTopup) {
-      const goodsUsd = hasGoods ? (convert(goodsCharged, card, 'USD') || 0) : 0;
-      const allUsd = goodsUsd + dl.cost;
-      const allUzs = convert(allUsd, 'USD', 'UZS');
-      const title = hasGoods ? t('grandTitle') : t('dlOnlyTitle');
-      sh.grand.innerHTML =
-        `<div class="grand__row"><span>${title}</span><b>${fmt(allUsd, 'USD')} USD</b></div>` +
-        `<div class="grand__sub">${allUzs != null ? `≈ ${fmt(allUzs, 'UZS')} UZS · ` : ''}${hasGoods ? t('grandSub').replace('{dl}', `${fmt(dl.cost, 'USD')} $`) : t('dlOnlySub')}</div>`;
+    // Final summary: what you actually need = top-up + delivery paid separately.
+    // Every line here adds up; the exact cost (without the rate buffer) is a note.
+    const topupPart = hasGoods || dlInTopup;
+    const dlSeparate = dl.cost > 0 && !dlInTopup;
+    if (dlSeparate || (topupPart && withBuf > charged + 1e-9)) {
+      const topupUsd = topupPart ? (convert(topup, card, 'USD') || 0) : 0;
+      const needUsd = topupUsd + (dlSeparate ? dl.cost : 0);
+      const realUsd = (topupPart ? (convert(charged, card, 'USD') || 0) : 0) + (dlSeparate ? dl.cost : 0);
+      const needUzs = convert(needUsd, 'USD', 'UZS');
+      const leftover = topupPart ? topup - charged : 0;
+      const g = (label, val, cls = '') => `<div class="grand__row ${cls}"><span>${label}</span><b>${val}</b></div>`;
+      let html = '';
+      if (dlSeparate) { // two separate payments → show how they add up
+        if (topupPart) html += g(t('sumTopup'), `${fmt(topup, card)} ${card}`, 'is-part');
+        html += g(t('sumDelivery'), `${fmt(dl.cost, 'USD')} USD`, 'is-part');
+        html += g(t('sumTotal'), `${fmt(needUsd, 'USD')} USD`, 'is-total');
+        if (needUzs != null) html += `<div class="grand__sub">≈ ${fmt(needUzs, 'UZS')} UZS</div>`;
+      }
+      if (leftover > 0.004) {
+        html += `<div class="grand__note">${t('sumNote')
+          .replace('{real}', `${fmt(realUsd, 'USD')} $`)
+          .replace('{left}', `${fmt(leftover, card)} ${card === 'USD' ? '$' : card}`)}</div>`;
+      }
+      sh.grand.innerHTML = html;
       sh.grand.hidden = false;
     }
   }
@@ -591,10 +635,12 @@
   async function fetchFiat() {
     try {
       const d = await withTimeout('https://api.exchangerate.fun/latest?base=USD');
-      if (d && d.rates && d.rates.EUR) return { rates: d.rates, src: 'exchangerate.fun' };
+      const r = cleanRates(d && d.rates);
+      if (r.EUR) return { rates: r, src: 'exchangerate.fun' };
     } catch (_) {}
     const d = await withTimeout('https://open.er-api.com/v6/latest/USD');
-    if (d && d.rates && d.rates.EUR) return { rates: d.rates, src: 'open.er-api.com' };
+    const r = cleanRates(d && d.rates);
+    if (r.EUR) return { rates: r, src: 'open.er-api.com' };
     throw new Error('fiat');
   }
 
@@ -602,7 +648,10 @@
     const ids = CRYPTO.map(c => c.id).join(',');
     const d = await withTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
     const out = {};
-    CRYPTO.forEach(c => { const p = d[c.id] && d[c.id].usd; if (p) out[c.code] = 1 / p; });
+    CRYPTO.forEach(c => {
+      const p = d && d[c.id] && d[c.id].usd;
+      if (typeof p === 'number' && Number.isFinite(p) && p > 0) out[c.code] = 1 / p;
+    });
     if (!Object.keys(out).length) throw new Error('crypto');
     return out;
   }
@@ -933,6 +982,7 @@
   }
 
   /* ================= Boot ================= */
+  if (rates) rates.rates = cleanRates(rates.rates);
   if (!state.list.includes(state.base)) state.base = state.list[0] || 'USD';
   applyTheme();
   applyI18n();

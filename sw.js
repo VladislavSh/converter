@@ -1,10 +1,15 @@
-const VERSION = 'flux-v7';
+// Offline support. Only same-origin files are cached; the rate APIs always go
+// to the network (the app keeps the last rates itself). No third-party hosts.
+const VERSION = 'flux-v9';
 const SHELL = [
   './',
   'index.html',
   'css/style.css',
+  'js/theme-init.js',
   'js/currencies.js',
   'js/app.js',
+  'fonts/manrope-latin-wght-normal.woff2',
+  'fonts/manrope-cyrillic-wght-normal.woff2',
   'icons/icon.svg',
   'icons/maskable.svg',
   'manifest.webmanifest'
@@ -17,37 +22,37 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== VERSION + '-flags').map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
+
+const putOk = (cacheName, req, res) => {
+  if (res && res.ok && res.type === 'basic') {
+    const copy = res.clone();
+    caches.open(cacheName).then(c => c.put(req, copy));
+  }
+  return res;
+};
 
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.origin !== location.origin) return; // rate APIs etc. — straight to network
 
-  // Rate APIs: always network (the app caches rates itself)
-  if (/exchangerate\.fun|er-api\.com|coingecko\.com/.test(url.host)) return;
-
-  // Flags & fonts: stale-while-revalidate
-  if (/flagcdn\.com|fonts\.(googleapis|gstatic)\.com/.test(url.host)) {
+  // Flags never change: cache first
+  if (url.pathname.includes('/icons/flags/')) {
     e.respondWith(
-      caches.open(VERSION + '-rt').then(async cache => {
-        const hit = await cache.match(req);
-        const net = fetch(req).then(res => { if (res.ok || res.type === 'opaque') cache.put(req, res.clone()); return res; }).catch(() => hit);
-        return hit || net;
-      })
+      caches.match(req).then(hit => hit || fetch(req).then(res => putOk(VERSION + '-flags', req, res)))
     );
     return;
   }
 
-  // App shell: network first, fall back to cache (so updates arrive quickly)
-  if (url.origin === location.origin) {
-    e.respondWith(
-      fetch(req)
-        .then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
-        .catch(() => caches.match(req).then(r => r || caches.match('index.html')))
-    );
-  }
+  // App shell: network first so updates arrive quickly, cache when offline
+  e.respondWith(
+    fetch(req)
+      .then(res => putOk(VERSION, req, res))
+      .catch(() => caches.match(req).then(r => r || caches.match('index.html')))
+  );
 });

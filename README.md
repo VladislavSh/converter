@@ -19,6 +19,19 @@ npx http-server -p 5173 -c-1
 
 и откройте http://localhost:5173. Для GitHub Pages достаточно залить содержимое репозитория.
 
+## Приватность и безопасность
+
+- Никакой аналитики, счётчиков и трекеров. Шрифт и флаги лежат в репозитории, сторонних CDN нет.
+- Сеть используется только для курсов: `api.exchangerate.fun`, `open.er-api.com` (запасной), `api.coingecko.com`.
+- Content-Security-Policy разрешает только собственные файлы и эти три API; `no-referrer`.
+- Ответы API и данные из `localStorage` проверяются (коды валют `A–Z`, только положительные числа) до вывода на страницу.
+- Выражения считает собственный парсер, без `eval`.
+
+## Сторонние ресурсы
+
+- Шрифт [Manrope](https://github.com/sharanda/manrope) — SIL Open Font License 1.1 (`fonts/LICENSE`)
+- Флаги [flag-icons](https://github.com/lipis/flag-icons) — MIT (`icons/flags/LICENSE`)
+
 ## Структура
 
 ```
