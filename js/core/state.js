@@ -2,6 +2,7 @@
 // migrations between versions. buildState() is pure — storage and browser
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
+import { cleanCustomRates } from './custom-rates.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
@@ -95,8 +96,12 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     input: cleanText(raw.input, '100'),
     // the amount was typed on the main screen and "Purchase" has not taken it yet
     amountFresh: raw.amountFresh === true,
+    // the user's own exchange rates and the one switched on ('' = market rates)
+    customRates: cleanCustomRates(raw.customRates),
+    rateId: '',
     shop: cleanShop(raw.shop)
   };
+  if (state.customRates.some(entry => entry.id === raw.rateId)) state.rateId = raw.rateId;
 
   if (src) migrate(state, Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1);
   if (!state.list.length) state.list = [...DEFAULT_LIST];

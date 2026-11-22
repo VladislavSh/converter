@@ -2,6 +2,7 @@
 // short lines, one emoji per block, the link last on a line of its own so the
 // messenger makes it clickable. Pure functions — sharing itself is in ui/dom.js.
 import { isCrypto } from '../data/currencies.js';
+import { describeCustomRate } from './custom-rates.js';
 import { evaluate } from './expression.js';
 import { formatAmount, formatMoney, formatNumber } from './format.js';
 import { flagCountry } from './names.js';
@@ -23,10 +24,15 @@ const dateTime = (timestamp, locale) => new Date(timestamp).toLocaleString(local
 
 const linkBlock = (t, url) => ['', `🔗 ${t('shareOpen')}`, url];
 
+/** The user's own rate, when one is switched on: the numbers differ from the market. */
+const customRateLine = (customRate, t, locale) => (customRate
+  ? [`📌 ${t('shareCustomRate', { name: customRate.name, rate: describeCustomRate(customRate, locale) })}`]
+  : []);
+
 /**
  * @returns {string|null} null when there is nothing to share (no amount or no rates)
  */
-export function converterShareText({ state, convert, t, locale, ratesAt, url }) {
+export function converterShareText({ state, convert, t, locale, ratesAt, customRate, url }) {
   const { base } = state;
   const value = evaluate(state.input);
   if (value == null) return null;
@@ -46,7 +52,11 @@ export function converterShareText({ state, convert, t, locale, ratesAt, url }) 
   if (!rows.length) return null;
 
   const lines = [`${flagEmoji(base)} ${format(value, base)} ${base} =`, '', ...rows];
-  if (Number.isFinite(ratesAt)) lines.push('', `🕒 ${t('shareRatesFrom', { when: dateTime(ratesAt, locale) })}`);
+  const notes = [
+    ...customRateLine(customRate, t, locale),
+    ...(Number.isFinite(ratesAt) ? [`🕒 ${t('shareRatesFrom', { when: dateTime(ratesAt, locale) })}`] : [])
+  ];
+  if (notes.length) lines.push('', ...notes);
   return [...lines, ...linkBlock(t, url)].join('\n');
 }
 
@@ -87,7 +97,7 @@ export function breakdownLines(result, { t, locale }) {
  * @param {object} options.result  what calcPurchase() returned
  * @returns {string|null} null when there is nothing to share (no price and no delivery)
  */
-export function purchaseShareText({ result, convert, t, locale, url }) {
+export function purchaseShareText({ result, convert, t, locale, customRate, url }) {
   const { delivery, card, summary } = result;
   if (!result.hasTopup && !(delivery.cost > 0)) return null;
   const money = (value, code) => `${formatMoney(value, code, locale)} ${code}`;
@@ -124,6 +134,7 @@ export function purchaseShareText({ result, convert, t, locale, url }) {
     cnyUzs == null ? '' : `1 CNY = ${formatMoney(cnyUzs, 'CNY', locale)} UZS`
   ].filter(Boolean);
   if (rates.length) lines.push(`📊 ${rates.join(' · ')}`);
+  lines.push(...customRateLine(customRate, t, locale));
 
   return [...lines, ...linkBlock(t, url)].join('\n');
 }

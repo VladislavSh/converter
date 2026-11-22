@@ -460,6 +460,52 @@ h1, h2, p { margin: 0; }
 }
 .guide__ok { margin-top: 18px; width: 100%; height: 48px; border-radius: 16px; background: var(--input-bg); font-size: 15px; font-weight: 700; }
 .guide__ok:hover { background: var(--card-hover); }
+/* ---------- Rate bar and the rates sheet ---------- */
+.rate-bar {
+  width: 100%; display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 0 12px 0 14px; height: 44px;
+  border-radius: 16px; background: var(--card); border: 1px solid var(--card-border);
+  font-size: 13.5px; text-align: left; transition: background .2s, border-color .2s;
+}
+.rate-bar:hover { background: var(--card-hover); }
+.rate-bar svg { width: 17px; height: 17px; flex: none; fill: none; stroke: var(--text-2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rate-bar__caption { color: var(--text-2); font-weight: 600; flex: none; }
+.rate-bar__name { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 40px; }
+.rate-bar__value { margin-left: auto; color: var(--text-2); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-variant-numeric: tabular-nums; }
+.rate-bar__more { margin-left: auto; }
+.rate-bar__value:not(:empty) + .rate-bar__more { margin-left: 0; }
+.rate-bar.is-custom { border-color: var(--accent-1); background: rgba(124, 92, 255, .12); }
+.rate-bar.is-custom svg:first-child { stroke: var(--accent-1); }
+
+.rate-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.rate-item { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 16px; background: var(--input-bg); border: 1px solid transparent; }
+.rate-item.is-on { border-color: var(--accent-1); background: rgba(124, 92, 255, .12); }
+.rate-item__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; text-align: left; }
+.rate-item .check { border-radius: 50%; }
+.rate-item.is-on .check { background: var(--accent); border-color: transparent; }
+.rate-item.is-on .check svg { transform: scale(1); }
+.rate-item__txt { display: grid; min-width: 0; gap: 2px; }
+.rate-item__name { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rate-item__note { font-size: 12.5px; line-height: 1.35; color: var(--text-2); }
+.rate-item__act { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--text-2); }
+.rate-item__act:hover { color: var(--text); background: var(--card-hover); }
+.rate-item__act svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rate-add { width: 100%; justify-content: center; }
+
+.rate-pair { display: flex; align-items: center; gap: 8px; }
+.rate-pair__sign { flex: none; font-weight: 800; font-size: 16px; color: var(--text-2); }
+.rate-pair input { flex: 1; min-width: 0; }
+.rate-pair select { width: 84px; flex: none; }
+.rate-market { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; margin: 8px 2px 0; font-size: 12.5px; color: var(--text-2); }
+.rate-error { margin: 8px 2px 0; font-size: 13px; font-weight: 600; color: #F2637E; }
+.rate-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.rate-actions .guide__ok { margin-top: 0; }
+.primary-btn { height: 48px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; transition: transform .2s var(--ease); }
+.primary-btn:active { transform: scale(.97); }
+@media (max-width: 350px) {
+  .rate-pair { gap: 6px; }
+  .rate-pair select { width: 74px; }
+}
+
 .sheet__grab { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .5; margin: 4px auto 6px; }
 .sheet__head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
 .sheet__head h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }

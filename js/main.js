@@ -1,12 +1,13 @@
 // Entry point: builds the state, creates the views and keeps rates fresh.
 import { APP_VERSION, STORAGE_KEYS, TIMING } from './config.js';
+import { activeCustomRate, withCustomRate } from './core/custom-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
 import { convert, restoreSnapshot } from './core/rates.js';
 import { buildState } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
 import { loadLatestRates } from './services/rates-api.js';
-import { adoptEarlierStorage, readJson, takeSessionFlag, writeJson } from './services/storage.js';
+import { adoptEarlierStorage, clearSessionFlag, readJson, takeSessionFlag, writeJson } from './services/storage.js';
 import { registerServiceWorker } from './services/sw-update.js';
 import { createUrlSync, currentLink } from './services/url-sync.js';
 import { installFlagFallback } from './ui/badge.js';
@@ -14,6 +15,7 @@ import { createConverterView } from './ui/converter.js';
 import { $, createToast, shareText } from './ui/dom.js';
 import { createPickerView } from './ui/picker.js';
 import { createPurchaseView } from './ui/purchase.js';
+import { createRatesView } from './ui/rates.js';
 import { createShell } from './ui/shell.js';
 
 try { adoptEarlierStorage(localStorage, STORAGE_KEYS); } catch { /* storage blocked */ }
@@ -26,6 +28,20 @@ const state = buildState(readJson(STORAGE_KEYS.state), {
 applyDeepLink(state, location.search, isKnownCurrency);
 let snapshot = restoreSnapshot(readJson(STORAGE_KEYS.rates));
 
+// The table calculations run on: the market rates, with one pair replaced
+// while one of the user's own rates is switched on. Rebuilt only when the
+// market snapshot or that rate changes.
+let tableInUse = { market: null, key: '', table: null };
+function ratesInUse() {
+  if (!snapshot) return null;
+  const custom = activeCustomRate(state);
+  const key = custom ? `${custom.from}|${custom.to}|${custom.rate}` : '';
+  if (tableInUse.market !== snapshot.rates || tableInUse.key !== key) {
+    tableInUse = { market: snapshot.rates, key, table: withCustomRate(snapshot.rates, custom) };
+  }
+  return tableInUse.table;
+}
+
 const syncUrl = createUrlSync(state);
 const toast = createToast($('#toast'), TIMING.toastMs);
 
@@ -36,7 +52,11 @@ const app = {
   get rates() { return snapshot; },
   t: (key, vars) => translate(state.lang, key, vars),
   locale: () => localeOf(state.lang),
-  convert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
+  /** With the rate the user switched on; null while there are no rates. */
+  convert: (value, from, to) => convert(ratesInUse(), value, from, to),
+  /** Always by the market rates, to compare the user's own rate with. */
+  marketConvert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
+  customRate: () => activeCustomRate(state),
   save: () => {
     writeJson(STORAGE_KEYS.state, state);
     syncUrl();
@@ -65,10 +85,12 @@ const shell = createShell(app, {
 const picker = createPickerView(app, { onListChange: () => converter.render() });
 const converter = createConverterView(app, { onEditList: () => picker.open() });
 const purchase = createPurchaseView(app);
+const customRates = createRatesView(app, { onChange: renderAll });
 
 function renderAll() {
   converter.render();
   purchase.render();
+  customRates.render();
 }
 
 let refreshing = false;
@@ -123,6 +145,7 @@ function dismissSplash() {
   setTimeout(() => {
     shell.hideSplash();
     document.body.classList.add('is-ready');
+    clearSessionFlag(STORAGE_KEYS.retryFlag); // the app started: js/boot-guard.js may retry again next time
   }, wait);
 }
 const splashLimit = setTimeout(dismissSplash, snapshot ? TIMING.splashMaxCachedMs : TIMING.splashMaxMs);

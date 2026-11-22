@@ -67,3 +67,10 @@ export function adoptEarlierStorage(storage, keys) {
   } catch { /* storage unavailable */ }
   return false;
 }
+
+/** Removes a sessionStorage entry; does nothing when storage is blocked. */
+export function clearSessionFlag(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch { /* storage blocked */ }
+}

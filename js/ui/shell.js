@@ -2,11 +2,10 @@
 // screen, footer and installing the app to the home screen.
 import { APP_NAME, APP_VERSION, RATE_SOURCES } from '../config.js';
 import { INSTALL_STEPS, installPlatform, isInstalled } from '../core/install.js';
-import { $, $$ } from './dom.js';
+import { $, $$, createSheet } from './dom.js';
 
 const THEME_COLORS = { light: '#F4F5FB', dark: '#0B0B14' };
 const SPLASH_FADE_MS = 700;
-const FOCUS_DELAY_MS = 250; // after the sheet's opening transition
 
 export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) {
   const el = {
@@ -20,9 +19,7 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     refresh: $('#refresh-btn'),
     tabs: $$('.view-tab'),
     views: { convert: $('#view-convert'), shop: $('#view-shop') },
-    app: $('#app'),
     installButtons: $$('[data-install]'),
-    installSheet: $('#install-sheet'),
     installSteps: $('#install-steps'),
     source: $('#source-text'),
     version: $('#version-text')
@@ -123,8 +120,8 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   // installation (Chrome, Edge) the button opens its dialog; elsewhere (Safari
   // on iPhone, Firefox) it shows where the menu item is.
   const platform = installPlatform(navigator);
+  const installGuide = createSheet($('#install-sheet'), $('#app'));
   let installPrompt = null;
-  let guideOpener = null;
 
   function renderInstallSteps() {
     el.installSteps.replaceChildren(...INSTALL_STEPS[platform].map(key => {
@@ -132,27 +129,6 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
       step.textContent = app.t(key);
       return step;
     }));
-  }
-
-  const guideIsOpen = () => el.installSheet.classList.contains('is-open');
-
-  function openInstallGuide() {
-    guideOpener = document.activeElement;
-    el.installSheet.classList.add('is-open');
-    el.installSheet.setAttribute('aria-hidden', 'false');
-    el.app.inert = true; // keep focus and screen readers inside the dialog
-    setTimeout(() => {
-      if (guideIsOpen()) $('[data-close].icon-btn', el.installSheet).focus({ preventScroll: true });
-    }, FOCUS_DELAY_MS);
-  }
-
-  function closeInstallGuide() {
-    if (!guideIsOpen()) return;
-    el.installSheet.classList.remove('is-open');
-    el.installSheet.setAttribute('aria-hidden', 'true');
-    el.app.inert = false;
-    guideOpener?.focus?.({ preventScroll: true });
-    guideOpener = null;
   }
 
   const showInstall = visible => el.installButtons.forEach(button => { button.hidden = !visible; });
@@ -168,11 +144,11 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
     showInstall(false);
-    closeInstallGuide();
+    installGuide.close();
   });
   el.installButtons.forEach(button => button.addEventListener('click', async () => {
     if (!installPrompt) {
-      openInstallGuide();
+      installGuide.open();
       return;
     }
     const prompt = installPrompt;
@@ -180,12 +156,6 @@ export function createShell(app, { onRefresh, onLanguageChange, onViewChange }) 
     prompt.prompt();
     await prompt.userChoice.catch(() => {});
   }));
-  el.installSheet.addEventListener('click', event => {
-    if (event.target.closest('[data-close]')) closeInstallGuide();
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeInstallGuide();
-  });
 
   return { applyTheme, applyTexts, setStatus, setView, setRefreshing, hideSplash };
 }

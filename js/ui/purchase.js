@@ -313,6 +313,7 @@ export function createPurchaseView(app) {
       convert: app.convert,
       t: app.t,
       locale: app.locale(),
+      customRate: app.customRate(),
       url: app.link()
     });
     if (text) app.share(text);

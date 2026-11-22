@@ -269,6 +269,7 @@ export function createConverterView(app, { onEditList }) {
       t: app.t,
       locale: app.locale(),
       ratesAt: app.rates?.ts,
+      customRate: app.customRate(),
       url: app.link()
     });
     if (text) app.share(text);

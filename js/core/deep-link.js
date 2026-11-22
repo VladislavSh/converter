@@ -1,8 +1,10 @@
 // Links to a calculation. The whole state of the open tab fits in the query:
 //   ?mode=converter&amount=100&from=USD&list=USD,CNY,UZS,RUB
-//   ?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=200&min=0&bank=0&buffer=2&delivery=off
+//   ?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off
+// With one of the user's own rates switched on, both get &xr=USD-UZS-12950&xrname=…
 // Everything in a link is untrusted: each parameter is validated on its own
 // and a bad one is simply ignored.
+import { activeCustomRate, adoptLinkedRate, customRateParam } from './custom-rates.js';
 import { evaluate, sanitizeExpression } from './expression.js';
 import { isCurrencyCode } from './rates.js';
 import { SHOP_ENUMS } from './state.js';
@@ -99,6 +101,8 @@ export function applyDeepLink(state, search, isKnown = () => true) {
   state.view = VIEW_BY_MODE[mode];
   if (state.view === 'convert') applyConverter(state, params, isKnown);
   else applyPurchase(state.shop, params);
+  // The numbers of a link are only the same with the rate it was made with
+  adoptLinkedRate(state, params.get('xr'), params.get('xrname'), code => isCurrencyCode(code) && isKnown(code));
   return true;
 }
 
@@ -132,6 +136,11 @@ export function buildQuery(state) {
     params.set('amount', state.input);
     params.set('from', state.base);
     params.set('list', state.list.join(','));
+  }
+  const custom = activeCustomRate(state);
+  if (custom) {
+    params.set('xr', customRateParam(custom));
+    params.set('xrname', custom.name);
   }
   return params.toString().replace(/%2C/g, ','); // commas are legal in a query and read better
 }

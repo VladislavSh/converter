@@ -174,6 +174,8 @@ test('the app is called CartRate everywhere a name is shown', () => {
   for (const key of Object.values(STORAGE_KEYS)) assert.match(key, /^cartrate_/);
   // theme-init.js runs before the modules and cannot import the key
   assert.ok(read('js/theme-init.js').includes(`'${STORAGE_KEYS.state}'`));
+  // the same for the start-up guard and its retry counter
+  assert.ok(read('js/boot-guard.js').includes(`'${STORAGE_KEYS.retryFlag}'`));
 });
 
 test('every import points to an existing file', () => {
