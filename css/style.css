@@ -545,6 +545,18 @@ body[data-view="banks"] .rate-bar { display: none; }
 .src-quote label { margin: 0 0 0 2px; }
 .src-quote select { width: 96px; flex: none; }
 .src-rows { display: grid; gap: 8px; }
+/* Kapitalbank: currency, buy, sell */
+.src-row.src-row--pair { display: grid; grid-template-columns: 82px minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 6px; }
+.field .src-row--pair select { width: 100%; }
+.src-row--head { margin-bottom: 6px; padding: 0 2px; font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+.kapital-hint { margin-bottom: 14px; }
+.kapital-hint .guide__lead { margin-bottom: 6px; }
+.kapital-hint .link-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Converter: buy or sell prices of a bank that has both */
+.side-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 14px 2px 0; }
+.side-seg { flex: none; width: 216px; height: 40px; }
+.side-seg button { font-size: 13.5px; }
+.side-bar__note { flex: 1 1 160px; margin: 0; font-size: 12px; line-height: 1.35; color: var(--text-2); }
 .src-row { display: flex; align-items: center; gap: 6px; }
 .src-row__sign { flex: none; font-weight: 800; font-size: 15px; color: var(--text-2); }
 .field .src-row select { width: 82px; flex: none; }

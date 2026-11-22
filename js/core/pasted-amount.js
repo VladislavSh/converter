@@ -4,7 +4,7 @@
 import { evaluate } from './expression.js';
 import { plainNumber } from './format.js';
 import { isCurrencyCode } from './rates.js';
-import { PRICE_CURRENCIES } from './state.js';
+import { ORDER_CURRENCY } from './state.js';
 
 const MAX_TEXT = 300;
 const MAX_VALUE = 1e15;
@@ -196,22 +196,21 @@ export function applyPastedAmount(state, pasted, hasRate) {
 }
 
 /**
- * Purchase: the price field takes yuan, dollars or sum. Those switch the
- * price currency; any other recognised currency is converted into the current
- * one. @returns {{price: string, currency: string, convertedFrom: string|null}}
+ * Order: the price currency is the user's choice and never changes by itself.
+ * An amount in another currency is converted into it ("$12" with yuan chosen
+ * → 86.4 CNY).
+ * @param {string} [target]  the currency to put the price in; the chosen one by default
+ * @returns {{price: string, currency: string, convertedFrom: string|null}|null}
+ *   null when there is no rate to convert with yet
  */
-export function pastedPrice(pasted, shop, convert) {
+export function pastedPrice(pasted, shop, convert, target = shop.priceCur) {
   const { value, currency } = pasted;
-  if (currency && currency !== shop.priceCur) {
-    if (PRICE_CURRENCIES.includes(currency)) {
-      return { price: plainNumber(value), currency, convertedFrom: null };
-    }
-    const converted = convert(value, currency, shop.priceCur);
-    if (converted != null) {
-      return { price: plainNumber(Math.round(converted * 100) / 100), currency: shop.priceCur, convertedFrom: currency };
-    }
+  if (currency && currency !== target) {
+    const converted = convert(value, currency, target);
+    if (converted == null) return null;
+    return { price: plainNumber(Math.round(converted * 100) / 100), currency: target, convertedFrom: currency };
   }
-  return { price: plainNumber(value), currency: shop.priceCur, convertedFrom: null };
+  return { price: plainNumber(value), currency: target, convertedFrom: null };
 }
 
 /**
@@ -228,10 +227,10 @@ export function takeConverterAmount(state, convert) {
     state.amountFresh = false;
     return null;
   }
-  const result = pastedPrice({ value, currency: state.base }, state.shop, convert);
-  // No rate yet for a currency the price field does not take: wait for the
-  // rates rather than turn "8000 RUB" into "8000 CNY".
-  if (result.currency !== state.base && !result.convertedFrom) return null;
+  // A new amount: the order is in yuan again, the amount converted into it
+  const result = pastedPrice({ value, currency: state.base }, state.shop, convert, ORDER_CURRENCY);
+  // No rate yet: wait for the rates rather than turn "8000 RUB" into "8000 CNY"
+  if (!result) return null;
   state.amountFresh = false;
   Object.assign(state.shop, { price: result.price, priceCur: result.currency });
   return { value, ...result };

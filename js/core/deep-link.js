@@ -1,8 +1,10 @@
 // Links to a calculation. The whole state of the open tab fits in the query:
 //   ?mode=converter&amount=100&from=USD&list=USD,CNY,UZS,RUB
 //   ?mode=purchase&price=450&cur=CNY&card=USD&fee=3&free=0&min=2&bank=0&buffer=2&delivery=off
-// With a rate source other than the market, both get &src=cbu (or a source of
-// one's own: &src=own&srcname=…&srcq=UZS&srcr=USD:12950,CNY:1800).
+// With a rate source other than the market, both get &src=cbu (or Kapitalbank
+// with its rates: &src=kapital&kr=USD:11950:12050&kd=22.11.2026, or a source of
+// one's own: &src=own&srcname=…&srcq=UZS&srcr=USD:12950,CNY:1800). A converter
+// counted by the banks' sell prices adds &side=sell (buy is the default).
 // Everything in a link is untrusted: each parameter is validated on its own
 // and a bad one is simply ignored.
 import { adoptLinkedSource, sourceParams } from './rate-sources.js';
@@ -59,6 +61,8 @@ function applyConverter(state, params, isKnown) {
   if (amount !== undefined) state.input = amount;
   // The old amount was typed in another currency and means nothing in the new one
   else if (state.base !== previousBase) state.input = DEFAULT_AMOUNT;
+  // Buy prices unless the link says sell: the numbers must match the sender's
+  state.rateSide = params.get('side') === 'sell' ? 'sell' : 'buy';
 }
 
 function applyPurchase(shop, params) {
@@ -147,6 +151,7 @@ export function buildQuery(state) {
     params.set('amount', state.input);
     params.set('from', state.base);
     params.set('list', state.list.join(','));
+    if (state.rateSide === 'sell') params.set('side', 'sell');
   }
   for (const [key, value] of sourceParams(state)) params.set(key, value);
   // commas and colons are legal in a query and read better unescaped

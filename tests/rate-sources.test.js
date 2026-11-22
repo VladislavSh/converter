@@ -16,7 +16,7 @@ const near = (actual, expected, message) =>
   assert.ok(Math.abs(actual - expected) < 1e-6, `${message ?? ''} ${actual} ≉ ${expected}`);
 const plain = text => text?.replace(/[\u00A0\u202F]/g, ' ');
 const fresh = () => buildState(null);
-const BANK = { name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '12 950' }, { code: 'CNY', rate: '1800' }, { code: 'RUB', rate: '150' }] };
+const BANK = { name: 'Обменник', quote: 'UZS', rates: [{ code: 'USD', rate: '12 950' }, { code: 'CNY', rate: '1800' }, { code: 'RUB', rate: '150' }] };
 const with3 = table => (value, from, to) => convert(table, value, from, to);
 
 test('a rate is read the way amounts are', () => {
@@ -30,7 +30,7 @@ test('a source of one\'s own holds several currencies and is switched on when ad
   const state = fresh();
   assert.deepEqual(saveSource(state, BANK), { ok: true, id: 's1' });
   assert.deepEqual(state.sources, [{
-    id: 's1', name: 'Капиталбанк', quote: 'UZS',
+    id: 's1', name: 'Обменник', quote: 'UZS',
     rates: [{ code: 'USD', rate: '12950' }, { code: 'CNY', rate: '1800' }, { code: 'RUB', rate: '150' }]
   }]);
   assert.equal(state.rateSource, 's1');
@@ -120,7 +120,7 @@ test('a source quoted in another currency, and currencies the market does not ha
 
 test('the source in use, and a short summary of it', () => {
   const state = fresh();
-  assert.deepEqual(resolveSource(state), { id: 'market', kind: 'market', source: null, missing: false });
+  assert.deepEqual(resolveSource(state), { id: 'market', kind: 'market', source: null, missing: false, side: 'buy', twoSided: false });
   saveSource(state, BANK);
   assert.equal(resolveSource(state).kind, 'own');
   state.rateSource = 'gone';
@@ -206,14 +206,14 @@ test('links made by 1.9–1.12 (&xr=USD-UZS-12950) still open with their rate', 
 
 test('single custom rates of earlier versions become sources; bank ones become the banks', () => {
   const pairs = [
-    { id: 'r1', name: 'Капиталбанк', from: 'USD', to: 'UZS', rate: '12990' },
+    { id: 'r1', name: 'Касса', from: 'USD', to: 'UZS', rate: '12990' },
     { id: 'r2', name: 'ЦБ', from: 'USD', to: 'UZS', rate: '12004.48' },
     { id: 'r3', name: 'Обменник', from: 'CNY', to: 'UZS', rate: '1800' },
     { id: 'r4', name: 'broken', from: 'USD', to: 'USD', rate: '1' }
   ];
   assert.deepEqual(sourcesFromPairs(pairs, 'r3'), {
     sources: [
-      { id: 's1', name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '12990' }] },
+      { id: 's1', name: 'Касса', quote: 'UZS', rates: [{ code: 'USD', rate: '12990' }] },
       { id: 's2', name: 'Обменник', quote: 'UZS', rates: [{ code: 'CNY', rate: '1800' }] }
     ],
     rateSource: 's2'
@@ -222,7 +222,7 @@ test('single custom rates of earlier versions become sources; bank ones become t
   assert.equal(sourcesFromPairs([{ id: 'r1', name: 'НБУ, продажа', from: 'USD', to: 'UZS', rate: '1' }], 'r1').rateSource, 'nbu');
 
   const upgraded = buildState({ v: 10, list: ['USD'], shop: {}, customRates: pairs, rateId: 'r1' });
-  assert.deepEqual(upgraded.sources.map(source => source.name), ['Капиталбанк', 'Обменник']);
+  assert.deepEqual(upgraded.sources.map(source => source.name), ['Касса', 'Обменник']);
   assert.equal(upgraded.rateSource, 's1');
   assert.equal('customRates' in upgraded, false, 'the old field is gone');
 });
@@ -230,9 +230,9 @@ test('single custom rates of earlier versions become sources; bank ones become t
 test('a shared calculation names its source', () => {
   const ru = (key, vars) => translate('ru', key, vars);
   const state = fresh();
-  const note = ru('shareSourceOwn', { name: 'Капиталбанк', rates: '1 USD = 12 950 UZS' });
+  const note = ru('shareSourceOwn', { name: 'Обменник', rates: '1 USD = 12 950 UZS' });
   const text = plain(converterShareText({ state, convert: with3(MARKET), t: ru, locale: 'ru-RU', rateNote: note, url: 'u' }));
-  assert.match(text, /\n\n📌 Курсы «Капиталбанк»: 1 USD = 12 950 UZS\n\n🔗/);
+  assert.match(text, /\n\n📌 Курсы «Обменник»: 1 USD = 12 950 UZS\n\n🔗/);
   assert.match(ru('shareSourceBank', { name: 'ЦБ Узбекистана', date: '21.11.2026' }), /^Курсы: ЦБ Узбекистана на 21\.11\.2026$/);
   const market = converterShareText({ state, convert: with3(MARKET), t: ru, locale: 'ru-RU', rateNote: null, url: 'u' });
   assert.equal(market.includes('📌'), false);
@@ -243,29 +243,29 @@ test('a shared calculation names its source', () => {
 test('a second source with a taken name is refused, renaming onto one too', () => {
   const state = fresh();
   saveSource(state, BANK);
-  assert.deepEqual(saveSource(state, { ...BANK, name: '  капиталбанк ' }), { ok: false, error: 'name' }, 'case and spaces do not matter');
+  assert.deepEqual(saveSource(state, { ...BANK, name: '  обменник ' }), { ok: false, error: 'name' }, 'case and spaces do not matter');
   saveSource(state, { name: 'Малика', quote: 'UZS', rates: [{ code: 'USD', rate: '12800' }] });
-  assert.deepEqual(saveSource(state, { id: 's2', name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '1' }] }), { ok: false, error: 'name' });
+  assert.deepEqual(saveSource(state, { id: 's2', name: 'Обменник', quote: 'UZS', rates: [{ code: 'USD', rate: '1' }] }), { ok: false, error: 'name' });
   assert.equal(saveSource(state, { id: 's1', ...BANK, rates: [{ code: 'USD', rate: '13000' }] }).ok, true, 'a source keeps its own name when edited');
-  assert.deepEqual(state.sources.map(source => source.name), ['Капиталбанк', 'Малика']);
+  assert.deepEqual(state.sources.map(source => source.name), ['Обменник', 'Малика']);
 });
 
 test('a link with a source the user already has by name updates it instead of adding a copy', () => {
   const state = fresh();
-  saveSource(state, { name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate: '12990' }] });
+  saveSource(state, { name: 'Обменник', quote: 'UZS', rates: [{ code: 'USD', rate: '12990' }] });
   selectSource(state, 'market');
-  applyDeepLink(state, '?mode=banks&src=own&srcname=%D0%9A%D0%B0%D0%BF%D0%B8%D1%82%D0%B0%D0%BB%D0%B1%D0%B0%D0%BD%D0%BA&srcq=UZS&srcr=USD:12050,EUR:13310');
-  assert.equal(state.sources.length, 1, 'still one "Капиталбанк"');
+  applyDeepLink(state, '?mode=banks&src=own&srcname=%D0%9E%D0%B1%D0%BC%D0%B5%D0%BD%D0%BD%D0%B8%D0%BA&srcq=UZS&srcr=USD:12050,EUR:13310');
+  assert.equal(state.sources.length, 1, 'still one "Обменник"');
   assert.deepEqual(state.sources[0].rates, [{ code: 'USD', rate: '12050' }, { code: 'EUR', rate: '13310' }], 'with the rates from the link');
   assert.equal(state.rateSource, 's1');
 });
 
 test('sources already doubled by name are merged: the one in use stays, else the newest', () => {
-  const kb = (id, rate) => ({ id, name: 'Капиталбанк', quote: 'UZS', rates: [{ code: 'USD', rate }] });
+  const kb = (id, rate) => ({ id, name: 'Обменник', quote: 'UZS', rates: [{ code: 'USD', rate }] });
   const other = { id: 's2', name: 'Малика', quote: 'UZS', rates: [{ code: 'USD', rate: '12800' }] };
 
   const newest = mergeSameNames([kb('s1', '12990'), other, kb('s3', '12050')], 'market');
-  assert.deepEqual(newest.sources.map(source => source.id), ['s3', 's2'], 'the newer "Капиталбанк" takes the place of the older');
+  assert.deepEqual(newest.sources.map(source => source.id), ['s3', 's2'], 'the newer "Обменник" takes the place of the older');
   assert.equal(newest.rateSource, 'market');
 
   const used = mergeSameNames([kb('s1', '12990'), other, kb('s3', '12050')], 's1');

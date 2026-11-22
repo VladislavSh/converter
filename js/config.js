@@ -1,7 +1,7 @@
 // App-wide constants. APP_VERSION must match VERSION in sw.js and the ?v=
 // query in index.html (tests/project.test.js checks this).
 export const APP_NAME = 'CartRate';
-export const APP_VERSION = '1.23.0';
+export const APP_VERSION = '1.24.0';
 
 export const STORAGE_KEYS = Object.freeze({
   state: 'cartrate_state',
@@ -25,7 +25,9 @@ export const RATE_SOURCES = Object.freeze({
   // The "Banks" tab. The Central Bank's JSON is open to any site; the
   // National Bank's site answers only from inside Uzbekistan.
   cbu: { url: 'https://cbu.uz/ru/arkhiv-kursov-valyut/json/', page: 'https://cbu.uz/ru/arkhiv-kursov-valyut/' },
-  nbu: { url: 'https://nbu.uz/uz/exchange-rates/json/', page: 'https://nbu.uz/exchange-rates' }
+  nbu: { url: 'https://nbu.uz/uz/exchange-rates/json/', page: 'https://nbu.uz/exchange-rates' },
+  // Kapitalbank gives its rates to no other site: only a link to its page, the rates are typed in
+  kapital: { page: 'https://kapitalbank.uz/personal/exchange-rate' }
 });
 
 export const TIMING = Object.freeze({

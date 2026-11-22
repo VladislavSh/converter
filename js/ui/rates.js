@@ -1,10 +1,12 @@
 // "Rate" bar under the tabs and its sheet: which source every calculation
-// uses — the market rates, a bank (the Central Bank, the National Bank) or a
-// source of the user's own with the rates of several currencies. The logic is
-// in core/rate-sources.js.
+// uses — the market rates, a bank (the Central Bank, the National Bank,
+// Kapitalbank) or a source of the user's own with the rates of several
+// currencies. Kapitalbank's buy and sell prices are typed in here too. The
+// logic is in core/rate-sources.js.
+import { RATE_SOURCES } from '../config.js';
 import {
-  BANK_SOURCES, DEFAULT_QUOTE, MAX_SOURCES, MAX_SOURCE_RATES,
-  removeSource, saveSource, selectSource, sourceSummary
+  BUILTIN_SOURCES, DEFAULT_QUOTE, DEFAULT_SIDE, KAPITAL, MAX_SOURCES, MAX_SOURCE_RATES,
+  removeSource, saveKapital, saveSource, selectSource, sourceSummary
 } from '../core/rate-sources.js';
 import { sanitizeExpression } from '../core/expression.js';
 import { formatAmount } from '../core/format.js';
@@ -33,38 +35,44 @@ export function createRatesView(app, { onChange }) {
     addRow: $('#rate-add-row'),
     fill: $('#rate-fill'),
     error: $('#rate-error'),
-    cancel: $('#rate-cancel')
+    cancel: $('#rate-cancel'),
+    nameField: $('#rate-name-field'),
+    quoteField: $('#rate-quote-field'),
+    kapitalHint: $('#kapital-hint'),
+    kapitalSite: $('#kapital-site'),
+    pairHead: $('#rate-pair-head')
   };
+  el.kapitalSite.href = RATE_SOURCES.kapital.page;
   const sheet = createSheet($('#rate-sheet'), $('#app'));
   let editingId = ''; // '' while a new source is being added
+  let kapitalMode = false; // the form holds Kapitalbank's buy and sell prices
 
   const own = () => app.state.sources;
   const hasRate = code => app.marketConvert(1, 'USD', code) != null;
 
   const sourceName = id => app.sourceName(id);
 
-  /** "Official rates for 21.11.2026", "Loading…" or "Not loaded". */
-  function bankNote(bank) {
-    const board = app.banks[bank];
-    if (board) return app.t(bank === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
-    return app.t(app.bankStatus[bank] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
-  }
-
   // ---------- the bar ----------
 
   function renderBar() {
-    const info = app.rateSource();
+    // The order is always counted by the buy prices, the converter by its choice
+    const info = app.rateSource(app.state.view === 'shop' ? DEFAULT_SIDE : app.state.rateSide);
     el.bar.classList.toggle('is-custom', info.kind !== 'market');
     el.barName.textContent = sourceName(info.id);
-    let value = '';
-    if (info.kind === 'bank') value = info.missing ? app.t('srcNotLoaded') : app.t('srcOnDate', { date: info.source.date });
-    else if (info.kind === 'own') value = sourceSummary(info.source, app.locale(), 1);
-    el.barValue.textContent = value;
+    const parts = [];
+    if (info.kind === 'bank') {
+      if (info.missing) parts.push(app.t(info.id === KAPITAL ? 'srcKapitalEmpty' : 'srcNotLoaded'));
+      else if (info.source.date) parts.push(app.t('srcOnDate', { date: info.source.date }));
+      if (info.twoSided && !info.missing) parts.push(app.t(info.side === 'sell' ? 'sideSell' : 'sideBuy').toLocaleLowerCase(app.locale()));
+    } else if (info.kind === 'own') {
+      parts.push(sourceSummary(info.source, app.locale(), 1));
+    }
+    el.barValue.textContent = parts.join(' · ');
   }
 
   // ---------- the list ----------
 
-  function itemHtml({ id, name, note, editable }) {
+  function itemHtml({ id, name, note, editable, editOnly }) {
     const active = app.state.rateSource === id;
     return `
       <li class="rate-item${active ? ' is-on' : ''}">
@@ -75,6 +83,8 @@ export function createRatesView(app, { onChange }) {
             <span class="rate-item__note">${escapeHtml(note)}</span>
           </span>
         </button>
+        ${editOnly ? `
+          <button type="button" class="rate-item__act" data-edit="${id}" aria-label="${escapeHtml(app.t('srcEditOne', { name }))}">${ICONS.edit}</button>` : ''}
         ${editable ? `
           <button type="button" class="rate-item__act" data-edit="${id}" aria-label="${escapeHtml(app.t('srcEditOne', { name }))}">${ICONS.edit}</button>
           <button type="button" class="rate-item__act" data-delete="${id}" aria-label="${escapeHtml(app.t('srcDeleteOne', { name }))}">${ICONS.trash}</button>` : ''}
@@ -84,12 +94,22 @@ export function createRatesView(app, { onChange }) {
   function renderList() {
     el.list.innerHTML = [
       itemHtml({ id: 'market', name: sourceName('market'), note: app.t('rateMarketNote') }),
-      ...BANK_SOURCES.map(bank => itemHtml({ id: bank, name: sourceName(bank), note: bankNote(bank) })),
+      ...BUILTIN_SOURCES.map(id => itemHtml({ id, name: sourceName(id), note: app.sourceNote(id), editOnly: id === KAPITAL })),
       ...own().map(source => itemHtml({
         id: source.id, name: source.name, note: sourceSummary(source, app.locale(), 3), editable: true
       }))
     ].join('');
     el.add.hidden = own().length >= MAX_SOURCES;
+  }
+
+  /** The form shows a source of one's own (name, quote, one rate per row) or Kapitalbank (buy and sell). */
+  function setMode(kapital) {
+    kapitalMode = kapital;
+    el.nameField.hidden = kapital;
+    el.quoteField.hidden = kapital;
+    el.kapitalHint.hidden = !kapital;
+    el.pairHead.hidden = !kapital;
+    el.fill.hidden = kapital; // market numbers are not the bank's
   }
 
   function showList() {
@@ -103,11 +123,12 @@ export function createRatesView(app, { onChange }) {
   // ---------- the form: a name, a quote currency and rows of rates ----------
 
   const rowEls = () => $$('[data-row]', el.rows);
-  const quote = () => el.quote.value;
+  const quote = () => (kapitalMode ? DEFAULT_QUOTE : el.quote.value);
 
   function currencyOptions(chosen) {
     return [...new Set([chosen, ...USUAL_CURRENCIES, ...app.state.list])]
       .filter(code => code && (code === chosen || !app.rates || hasRate(code)))
+      .filter(code => !kapitalMode || code === chosen || code !== DEFAULT_QUOTE) // Kapitalbank quotes in sums
       .map(code => `<option value="${code}"${code === chosen ? ' selected' : ''}>${code}</option>`)
       .join('');
   }
@@ -120,8 +141,10 @@ export function createRatesView(app, { onChange }) {
 
   function refreshRows() {
     for (const row of rowEls()) {
-      $('.src-row__quote', row).textContent = quote();
-      $('.src-row__rate', row).placeholder = marketHint($('.src-row__code', row).value);
+      const hint = marketHint($('.src-row__code', row).value);
+      const quoteLabel = $('.src-row__quote', row);
+      if (quoteLabel) quoteLabel.textContent = quote();
+      for (const input of $$('.src-row__rate, .src-row__sell', row)) input.placeholder = hint;
     }
     el.addRow.hidden = rowEls().length >= MAX_SOURCE_RATES;
   }
@@ -132,10 +155,23 @@ export function createRatesView(app, { onChange }) {
     return [...USUAL_CURRENCIES, ...app.state.list].find(code => code !== quote() && !used.includes(code)) ?? 'USD';
   }
 
-  function addRow(code = nextCode(), rate = '') {
+  function addRow(code = nextCode(), rate = '', sell = '') {
     const row = document.createElement('div');
-    row.className = 'src-row';
+    row.className = kapitalMode ? 'src-row src-row--pair' : 'src-row';
     row.dataset.row = '';
+    if (kapitalMode) {
+      const field = (cls, key) => `<input class="${cls}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="${escapeHtml(app.t(key))}">`;
+      row.innerHTML = `
+        <select class="src-row__code" aria-label="${escapeHtml(app.t('srcCurrency'))}">${currencyOptions(code)}</select>
+        ${field('src-row__rate', 'sideBuy')}
+        ${field('src-row__sell', 'sideSell')}
+        <button type="button" class="src-row__remove" data-remove aria-label="${escapeHtml(app.t('srcRemoveRow'))}">${ICONS.close}</button>`;
+      $('.src-row__rate', row).value = rate;
+      $('.src-row__sell', row).value = sell;
+      el.rows.append(row);
+      refreshRows();
+      return row;
+    }
     row.innerHTML = `
       <span class="src-row__sign">1</span>
       <select class="src-row__code" aria-label="${escapeHtml(app.t('srcCurrency'))}">${currencyOptions(code)}</select>
@@ -149,7 +185,12 @@ export function createRatesView(app, { onChange }) {
     return row;
   }
 
-  const readRows = () => rowEls().map(row => ({ code: $('.src-row__code', row).value, rate: $('.src-row__rate', row).value }));
+  const readRows = () => rowEls().map(row => ({
+    code: $('.src-row__code', row).value,
+    rate: $('.src-row__rate', row).value,
+    buy: $('.src-row__rate', row).value,
+    sell: $('.src-row__sell', row)?.value ?? ''
+  }));
 
   function showError(key, vars = {}, row = -1) {
     el.error.textContent = key ? app.t(key, { n: MAX_SOURCES, ...vars }) : '';
@@ -159,6 +200,7 @@ export function createRatesView(app, { onChange }) {
 
   /** @param {object} [source] a saved source to change; none = a new one */
   function showForm(source) {
+    setMode(false);
     editingId = source?.id ?? '';
     el.name.value = source?.name ?? '';
     el.quote.innerHTML = currencyOptions(source?.quote ?? DEFAULT_QUOTE);
@@ -173,7 +215,41 @@ export function createRatesView(app, { onChange }) {
     if (matchMedia('(hover: hover)').matches) el.name.focus({ preventScroll: true });
   }
 
+  /** Kapitalbank's buy and sell prices, typed in from the bank's page. */
+  function showKapitalForm() {
+    setMode(true);
+    editingId = KAPITAL;
+    el.rows.innerHTML = '';
+    const { rates } = app.state.kapital;
+    if (rates.length) rates.forEach(entry => addRow(entry.code, entry.buy, entry.sell));
+    else ['USD', 'EUR', 'RUB', 'CNY'].forEach(code => addRow(code));
+    showError('');
+    el.title.textContent = app.t('kapitalTitle');
+    el.pick.hidden = true;
+    el.form.hidden = false;
+  }
+
+  function submitKapital() {
+    const outcome = saveKapital(app.state, readRows());
+    if (!outcome.ok) {
+      const row = outcome.row ?? -1;
+      showError(ERROR_TEXTS[outcome.error] ?? 'rateValueError', { code: DEFAULT_QUOTE }, row);
+      (rowEls()[row]?.querySelector('.src-row__rate') ?? el.rows.querySelector('.src-row__rate'))?.focus();
+      return;
+    }
+    // Entered to be used: the calculations switch to the bank
+    app.state.rateSource = KAPITAL;
+    app.save();
+    onChange();
+    sheet.close();
+    app.toast(app.t('srcSavedOn', { name: sourceName(KAPITAL) }));
+  }
+
   function submitForm() {
+    if (kapitalMode) {
+      submitKapital();
+      return;
+    }
     const outcome = saveSource(app.state, {
       id: editingId || undefined, name: el.name.value, quote: quote(), rates: readRows()
     });
@@ -209,7 +285,8 @@ export function createRatesView(app, { onChange }) {
     const remove = event.target.closest('[data-delete]');
     const choose = event.target.closest('[data-id]');
     if (edit) {
-      showForm(own().find(source => source.id === edit.dataset.edit));
+      if (edit.dataset.edit === KAPITAL) showKapitalForm();
+      else showForm(own().find(source => source.id === edit.dataset.edit));
     } else if (remove) {
       if (!removeSource(app.state, remove.dataset.delete)) return;
       app.save();
@@ -218,6 +295,11 @@ export function createRatesView(app, { onChange }) {
       app.toast(app.t('srcDeleted'));
       $('[data-id="market"]', el.list).focus();
     } else if (choose) {
+      // Kapitalbank without rates: they are entered first
+      if (choose.dataset.id === KAPITAL && !app.state.kapital.rates.length) {
+        showKapitalForm();
+        return;
+      }
       if (!selectSource(app.state, choose.dataset.id)) return;
       app.save();
       onChange();
@@ -261,7 +343,7 @@ export function createRatesView(app, { onChange }) {
     }
   });
   el.rows.addEventListener('input', event => {
-    if (!event.target.matches('.src-row__rate')) return;
+    if (!event.target.matches('.src-row__rate, .src-row__sell')) return;
     const clean = sanitizeExpression(event.target.value);
     if (clean !== event.target.value) event.target.value = clean;
     event.target.closest('[data-row]').classList.remove('is-error');
@@ -288,6 +370,11 @@ export function createRatesView(app, { onChange }) {
     showForm();
   }
   function openSource(id) {
+    if (id === KAPITAL) {
+      sheet.open();
+      showKapitalForm();
+      return;
+    }
     const source = own().find(item => item.id === id);
     if (!source) return;
     sheet.open();

@@ -114,42 +114,39 @@ test('converter: a currency without a rate does not change the source', () => {
   assert.deepEqual(state, { list: ['USD', 'CNY'], base: 'USD', input: '30' });
 });
 
-test('purchase: yuan, dollars and sum switch the price currency', () => {
+test('order: a pasted price never switches the chosen currency, it is converted into it', () => {
   const shop = { ...SHOP_DEFAULTS, priceCur: 'CNY' };
   assert.deepEqual(pastedPrice({ value: 45.5, currency: null }, shop, cv), { price: '45.5', currency: 'CNY', convertedFrom: null });
   assert.deepEqual(pastedPrice({ value: 45.5, currency: 'CNY' }, shop, cv), { price: '45.5', currency: 'CNY', convertedFrom: null });
-  assert.deepEqual(pastedPrice({ value: 12.99, currency: 'USD' }, shop, cv), { price: '12.99', currency: 'USD', convertedFrom: null });
-  assert.deepEqual(pastedPrice({ value: 150000, currency: 'UZS' }, shop, cv), { price: '150000', currency: 'UZS', convertedFrom: null });
+  assert.deepEqual(pastedPrice({ value: 10, currency: 'USD' }, shop, cv), { price: '70', currency: 'CNY', convertedFrom: 'USD' });
+  const dollars = { ...SHOP_DEFAULTS, priceCur: 'USD' };
+  assert.deepEqual(pastedPrice({ value: 70, currency: 'CNY' }, dollars, cv), { price: '10', currency: 'USD', convertedFrom: 'CNY' }, 'dollars chosen: yuan become dollars');
 });
 
 test('purchase: another currency is converted into the price currency', () => {
   const shop = { ...SHOP_DEFAULTS, priceCur: 'CNY' };
   assert.deepEqual(pastedPrice({ value: 1600, currency: 'RUB' }, shop, cv), { price: '140', currency: 'CNY', convertedFrom: 'RUB' });
   assert.deepEqual(pastedPrice({ value: 100, currency: 'RUB' }, shop, cv), { price: '8.75', currency: 'CNY', convertedFrom: 'RUB' });
-  assert.deepEqual(
-    pastedPrice({ value: 1600, currency: 'RUB' }, shop, () => null),
-    { price: '1600', currency: 'CNY', convertedFrom: null },
-    'without rates the number is pasted as it is'
-  );
+  assert.equal(pastedPrice({ value: 1600, currency: 'RUB' }, shop, () => null), null, 'without a rate nothing is pasted: 1600 RUB is not 1600 CNY');
 });
 
 // ---------- the amount typed on the main screen goes into "Purchase" ----------
 
 const typed = (base, input, shop = {}) => ({ base, input, amountFresh: true, shop: { ...SHOP_DEFAULTS, ...shop } });
 
-test('the typed amount becomes the item price in its own currency', () => {
+test('the typed amount becomes the item price, always in yuan', () => {
   const yuan = typed('CNY', '450', { price: '12', priceCur: 'USD' });
   assert.deepEqual(takeConverterAmount(yuan, cv), { value: 450, price: '450', currency: 'CNY', convertedFrom: null });
-  assert.deepEqual([yuan.shop.price, yuan.shop.priceCur], ['450', 'CNY']);
+  assert.deepEqual([yuan.shop.price, yuan.shop.priceCur], ['450', 'CNY'], 'a new amount: the order is in yuan again');
   assert.equal(yuan.amountFresh, false);
 
-  const dollars = typed('USD', '12,99');
+  const dollars = typed('USD', '10');
   takeConverterAmount(dollars, cv);
-  assert.deepEqual([dollars.shop.price, dollars.shop.priceCur], ['12.99', 'USD']);
+  assert.deepEqual([dollars.shop.price, dollars.shop.priceCur], ['70', 'CNY'], 'dollars are converted, not switched to');
 
-  const sum = typed('UZS', '1 500 000');
+  const sum = typed('UZS', '1 200 000');
   takeConverterAmount(sum, cv);
-  assert.deepEqual([sum.shop.price, sum.shop.priceCur], ['1500000', 'UZS']);
+  assert.deepEqual([sum.shop.price, sum.shop.priceCur], ['700', 'CNY']);
 });
 
 test('a calculation is carried over as its result', () => {

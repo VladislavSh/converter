@@ -4,9 +4,9 @@ import { APP_VERSION, RATE_SOURCES, STORAGE_KEYS, TIMING } from './config.js';
 import { restoreBankCache } from './core/bank-rates.js';
 import { applyDeepLink } from './core/deep-link.js';
 import { isKnownCurrency } from './core/names.js';
-import { resolveSource, sourceSummary, sourceTable } from './core/rate-sources.js';
+import { KAPITAL, resolveSource, sourceSummary, sourceTable } from './core/rate-sources.js';
 import { convert, restoreSnapshot } from './core/rates.js';
-import { buildState, restoreDroppedSum, startWithoutDelivery } from './core/state.js';
+import { buildState, restoreDroppedSum, startOrderInYuan, startWithoutDelivery } from './core/state.js';
 import { localeOf, translate } from './i18n.js';
 import { loadBankBoard } from './services/bank-rates-api.js';
 import { loadLatestRates } from './services/rates-api.js';
@@ -35,6 +35,7 @@ const state = buildState(saved, {
   prefersLight: matchMedia('(prefers-color-scheme: light)').matches
 });
 startWithoutDelivery(state);
+startOrderInYuan(state);
 // A link to a calculation (?mode=…) wins over what was saved on this device
 applyDeepLink(state, location.search, isKnownCurrency);
 restoreDroppedSum(state, Number.isInteger(saved?.v) ? saved.v : null);
@@ -43,14 +44,15 @@ let banks = restoreBankCache(readJson(STORAGE_KEYS.banks));
 const bankStatus = { cbu: 'idle', nbu: 'idle' }; // 'loading' | 'ok' | 'failed'
 
 // The table calculations run on: the market rates with the chosen source's
-// rates put in. Rebuilt only when the market rates or that source change.
-let tableInUse = { key: '', table: null };
-function ratesInUse() {
+// rates put in, by the buy or the sell prices of a bank that has both. One
+// table per side, rebuilt only when the market rates or that source change.
+const tablesInUse = {};
+function ratesInUse(side) {
   if (!snapshot) return null;
-  const { kind, source } = resolveSource(state, banks);
-  const key = `${snapshot.ts}|${state.rateSource}|${kind === 'bank' ? source?.ts : JSON.stringify(source)}`;
-  if (tableInUse.key !== key) tableInUse = { key, table: sourceTable(snapshot.rates, source) };
-  return tableInUse.table;
+  const { kind, source } = resolveSource(state, banks, side);
+  const key = `${snapshot.ts}|${state.rateSource}|${kind === 'bank' && source?.ts ? source.ts : JSON.stringify(source)}`;
+  if (tablesInUse[side]?.key !== key) tablesInUse[side] = { key, table: sourceTable(snapshot.rates, source) };
+  return tablesInUse[side].table;
 }
 
 const syncUrl = createUrlSync(state);
@@ -67,24 +69,53 @@ const app = {
   get bankStatus() { return bankStatus; },
   t,
   locale: () => localeOf(state.lang),
-  /** With the chosen rate source; null while there are no rates. */
-  convert: (value, from, to) => convert(ratesInUse(), value, from, to),
+  /**
+   * With the chosen rate source; null while there are no rates.
+   * @param {'buy'|'sell'} [side]  a bank's buy or sell prices; the converter's choice by default
+   */
+  convert: (value, from, to, side = state.rateSide) => convert(ratesInUse(side), value, from, to),
   /** Always by the market rates, to compare a source of one's own with. */
   marketConvert: (value, from, to) => (snapshot ? convert(snapshot.rates, value, from, to) : null),
-  /** The source in use: {id, kind, source, missing}. */
-  rateSource: () => resolveSource(state, banks),
+  /** The source in use: {id, kind, source, missing, side, twoSided}. */
+  rateSource: (side = state.rateSide) => resolveSource(state, banks, side),
   /** What a source is called: the market one by the service it comes from. */
   sourceName: id => {
     if (id === 'market') return snapshot?.source || RATE_SOURCES.fiatPrimary.name;
     if (id === 'cbu') return t('bankCbu');
-    if (id === 'nbu') return t('bankNbuSell');
+    if (id === 'nbu') return t('bankNbu');
+    if (id === KAPITAL) return t('bankKapital');
     return state.sources.find(source => source.id === id)?.name ?? '';
   },
-  /** One line for a shared calculation, when its numbers are not the market ones. */
-  rateNote: () => {
-    const { kind, id, source, missing } = resolveSource(state, banks);
+  /** One line under a source's name in the lists: how fresh it is, or what is in it. */
+  sourceNote: id => {
+    if (id === 'market') return t('rateMarketNote');
+    if (id === KAPITAL) {
+      const { rates, date } = state.kapital;
+      if (!rates.length) return t('srcKapitalEmpty');
+      return date ? t('srcKapitalNote', { date }) : t('srcKapitalNoDate');
+    }
+    if (BANKS.includes(id)) {
+      const board = banks[id];
+      if (!board) return t(bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
+      return t(id === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
+    }
+    const own = state.sources.find(source => source.id === id);
+    return own ? sourceSummary(own, localeOf(state.lang), 3) : '';
+  },
+  /**
+   * One line for a shared calculation, when its numbers are not the market ones.
+   * @param {'buy'|'sell'} [side]  which prices of a bank with two of them were used
+   */
+  rateNote: (side = state.rateSide) => {
+    const { kind, id, source, missing, twoSided } = resolveSource(state, banks, side);
     if (kind === 'market' || missing) return null;
-    if (kind === 'bank') return t('shareSourceBank', { name: app.sourceName(id), date: source.date });
+    if (kind === 'bank') {
+      // "Курсы: Капиталбанк, покупка, на 22.11.2026 (1 USD = 11 950 UZS · …)"
+      const sideWord = t(side === 'sell' ? 'sideSell' : 'sideBuy').toLocaleLowerCase(localeOf(state.lang));
+      const name = twoSided ? `${app.sourceName(id)}, ${sideWord},` : app.sourceName(id);
+      const line = source.date ? t('shareSourceBank', { name, date: source.date }) : t('shareSourceNoDate', { name: name.replace(/,$/, '') });
+      return id === KAPITAL ? `${line} (${sourceSummary(source, localeOf(state.lang), 3)})` : line;
+    }
     return t('shareSourceOwn', { name: source.name, rates: sourceSummary(source, localeOf(state.lang), 3) });
   },
   save: () => {
@@ -113,10 +144,11 @@ const shell = createShell(app, {
   onViewChange: view => {
     if (view === 'convert') converter.render();
     else if (view === 'shop') purchase.takeAmount(); // the amount typed on the main screen becomes the price
+    rateSources.render(); // the bar names the buy or the sell side of the tab
   }
 });
 const picker = createPickerView(app, { onListChange: () => converter.render() });
-const converter = createConverterView(app, { onEditList: () => picker.open(), keypad });
+const converter = createConverterView(app, { onEditList: () => picker.open(), keypad, onSideChange: () => renderAll() });
 const purchase = createPurchaseView(app, { keypad });
 const rateSources = createRatesView(app, { onChange: renderAll });
 const bankView = createBanksView(app, {

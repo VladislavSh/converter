@@ -34,6 +34,8 @@ test('a current state is restored as it was saved', () => {
     list: ['UZS', 'USD', 'KZT'], base: 'KZT', input: '120*3', amountFresh: true,
     sources: [{ id: 's1', name: 'Bank', quote: 'UZS', rates: [{ code: 'USD', rate: '12950' }, { code: 'CNY', rate: '1800' }] }],
     rateSource: 's1',
+    kapital: { date: '22.11.2026', rates: [{ code: 'USD', buy: '11950', sell: '12050' }] },
+    rateSide: 'sell',
     shop: { ...SHOP_DEFAULTS, price: '45,5', card: 'UZS', dlOn: true, dlMethod: 'auto', dlWeight: '0.34' }
   };
   assert.deepEqual(buildState(structuredClone(saved)), saved);

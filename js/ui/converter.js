@@ -3,6 +3,7 @@ import { evaluate, isExpression, sanitizeExpression } from '../core/expression.j
 import { formatAmount, plainNumber } from '../core/format.js';
 import { currencyName } from '../core/names.js';
 import { switchSource } from '../core/currency-list.js';
+import { RATE_SIDES } from '../core/rate-sources.js';
 import { applyPastedAmount, parsePastedAmount } from '../core/pasted-amount.js';
 import { converterShareText } from '../core/share-text.js';
 import { badgeHtml } from './badge.js';
@@ -13,7 +14,7 @@ const HERO_SIZES = [[7, 'xl'], [10, 'l'], [14, 'm'], [Infinity, 's']];
 const RESULT_SIZES = [[11, 'l'], [15, 'm'], [Infinity, 's']];
 const sizeFor = (length, sizes) => sizes.find(([max]) => length <= max)[1];
 
-export function createConverterView(app, { onEditList, keypad }) {
+export function createConverterView(app, { onEditList, keypad, onSideChange }) {
   const el = {
     hero: $('#hero'),
     tabs: $('#src-tabs'),
@@ -22,7 +23,9 @@ export function createConverterView(app, { onEditList, keypad }) {
     expr: $('#amount-expr'),
     results: $('#results'),
     edit: $('#manage-btn'),
-    share: $('#conv-share')
+    share: $('#conv-share'),
+    sideSeg: $('#side-seg'),
+    sideNote: $('#side-note')
   };
   let builtFor = '';
 
@@ -113,7 +116,26 @@ export function createConverterView(app, { onEditList, keypad }) {
       builtFor = key;
     }
     updateValues();
+    renderSide();
     revealActiveTab(); // also after the tab was hidden while the chips were built
+  }
+
+  /** Buy or sell: which prices of a bank that has both the converter counts by. */
+  function renderSide() {
+    for (const button of $$('button[data-side]', el.sideSeg)) {
+      const on = button.dataset.side === app.state.rateSide;
+      button.classList.toggle('is-active', on);
+      button.setAttribute('aria-checked', String(on));
+      button.tabIndex = on ? 0 : -1;
+    }
+    const info = app.rateSource();
+    el.sideNote.textContent = info.twoSided ? app.t('sideNoteTwo') : app.t('sideNoteOne', { name: app.sourceName(info.id) });
+  }
+  function setSide(side) {
+    if (side === app.state.rateSide || !RATE_SIDES.includes(side)) return;
+    app.state.rateSide = side;
+    app.save();
+    onSideChange();
   }
 
   /** @param {{keepAmount?: boolean}} [options] keepAmount: only the currency changes (the chips) */
@@ -138,6 +160,18 @@ export function createConverterView(app, { onEditList, keypad }) {
     app.save();
     updateValues();
   }
+
+  // --- buy / sell (a radio group of two) ---
+  el.sideSeg.addEventListener('click', event => {
+    const button = event.target.closest('button[data-side]');
+    if (button) setSide(button.dataset.side);
+  });
+  el.sideSeg.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    setSide(app.state.rateSide === 'buy' ? 'sell' : 'buy');
+    $(`button[data-side="${app.state.rateSide}"]`, el.sideSeg).focus();
+  });
 
   // --- source currency chips (a radio group: arrows move the selection) ---
   // A chip changes only the currency of the amount: «100» stays 100, now in

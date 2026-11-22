@@ -20,11 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/theme-init.js?v=1.23.0"></script>
-  <script src="js/boot-guard.js?v=1.23.0"></script>
-  <script src="js/install-early.js?v=1.23.0"></script>
+  <script src="js/theme-init.js?v=1.24.0"></script>
+  <script src="js/boot-guard.js?v=1.24.0"></script>
+  <script src="js/install-early.js?v=1.24.0"></script>
   <link rel="preload" href="fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=1.23.0">
+  <link rel="stylesheet" href="css/style.css?v=1.24.0">
 </head>
 <body>
 
@@ -118,6 +118,15 @@
         </div>
         <input class="hero__input" id="amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="0">
         <div class="hero__expr" id="amount-expr" aria-live="polite"></div>
+      </div>
+
+      <!-- Banks with buy and sell prices: which of them the converter counts by -->
+      <div class="side-bar">
+        <div class="seg side-seg" id="side-seg" role="radiogroup" data-i18n-aria="sideLabel" aria-label="Курс банков: покупка или продажа">
+          <button type="button" role="radio" aria-checked="true" class="is-active" data-side="buy" data-i18n="sideBuy">Покупка</button>
+          <button type="button" role="radio" aria-checked="false" data-side="sell" data-i18n="sideSell">Продажа</button>
+        </div>
+        <p class="side-bar__note" id="side-note"></p>
       </div>
 
       <ul class="results" id="results"></ul>
@@ -425,16 +434,27 @@
       </button>
     </div>
     <form id="rate-form" novalidate hidden>
-      <div class="field">
+      <!-- Kapitalbank: its rates are typed in from the bank's page -->
+      <div class="kapital-hint" id="kapital-hint" hidden>
+        <p class="guide__lead" data-i18n="kapitalHint">Сайт банка не отдаёт курсы другим сайтам — перепишите их со страницы банка.</p>
+        <a class="link-btn" id="kapital-site" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+          <span data-i18n="kapitalOpenSite">Открыть курсы на сайте банка</span>
+        </a>
+      </div>
+      <div class="field" id="rate-name-field">
         <label for="rate-name" data-i18n="rateName">Название</label>
         <input id="rate-name" type="text" maxlength="30" autocomplete="off" enterkeyhint="next" data-i18n-ph="rateNamePh" placeholder="Например, Капиталбанк">
       </div>
-      <div class="field field--gap src-quote">
+      <div class="field field--gap src-quote" id="rate-quote-field">
         <label for="rate-quote" data-i18n="srcQuote">Курсы указаны в</label>
         <select id="rate-quote"></select>
       </div>
       <div class="field field--gap">
         <span class="field__label" data-i18n="srcRates">Курсы валют</span>
+        <div class="src-row src-row--pair src-row--head" id="rate-pair-head" aria-hidden="true" hidden>
+          <span data-i18n="srcCurrency">Валюта</span><span data-i18n="sideBuy">Покупка</span><span data-i18n="sideSell">Продажа</span><span></span>
+        </div>
         <div class="src-rows" id="rate-rows"></div>
         <div class="src-tools">
           <button type="button" class="link-btn" id="rate-add-row">
@@ -445,7 +465,6 @@
         </div>
       </div>
       <p class="card__note" data-i18n="srcHint">Пустые поля не сохраняются. Валюты, которых нет в источнике, считаются по рынку.</p>
-      </div>
       <p class="rate-error" id="rate-error" role="alert" hidden></p>
       <div class="rate-actions">
         <button type="button" class="guide__ok" id="rate-cancel" data-i18n="rateCancel">Отмена</button>
@@ -526,6 +545,6 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="js/main.js?v=1.23.0"></script>
+<script type="module" src="js/main.js?v=1.24.0"></script>
 </body>
 </html>

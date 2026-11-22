@@ -2,11 +2,13 @@
 // migrations between versions. buildState() is pure — storage and browser
 // details are passed in — so it can be tested in Node.
 import { DEFAULT_LIST } from '../data/currencies.js';
-import { cleanSources, isSourceId, mergeSameNames, sourcesFromPairs } from './rate-sources.js';
+import {
+  DEFAULT_SIDE, RATE_SIDES, adoptOwnKapital, cleanKapital, cleanSources, isSourceId, mergeSameNames, sourcesFromPairs
+} from './rate-sources.js';
 import { isCurrencyCode } from './rates.js';
 import { parseNumber } from './purchase.js';
 
-export const STATE_VERSION = 11;
+export const STATE_VERSION = 12;
 
 /** The tabs: converter, purchase, banks. */
 export const VIEWS = Object.freeze(['convert', 'shop', 'banks']);
@@ -26,6 +28,8 @@ export const SHOP_DEFAULTS = Object.freeze({
 
 /** Currencies an item price can be entered in (the options of the price select). */
 export const PRICE_CURRENCIES = Object.freeze(['CNY', 'USD', 'UZS']);
+/** Pinduoduo prices are in yuan: the price currency on start and whenever the price is reset. */
+export const ORDER_CURRENCY = 'CNY';
 
 /** Purchase-form fields with a fixed set of values. */
 export const SHOP_ENUMS = {
@@ -105,6 +109,11 @@ export function startWithoutDelivery(state) {
   clearDelivery(state.shop);
 }
 
+/** The order starts in yuan every time the app opens; a link with another currency is applied after this. */
+export function startOrderInYuan(state) {
+  state.shop.priceCur = ORDER_CURRENCY;
+}
+
 /**
  * Up to 1.10.0 a phone whose browser could not name the sum dropped UZS from
  * the list on every start (the list in the address bar was checked against the
@@ -137,13 +146,18 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
     input: cleanText(raw.input, '100'),
     // the amount was typed on the main screen and "Purchase" has not taken it yet
     amountFresh: raw.amountFresh === true,
-    // where the rates come from: 'market', 'cbu', 'nbu' or a source of the user's own
+    // where the rates come from: 'market', 'cbu', 'nbu', 'kapital' or a source of the user's own
     sources: cleanSources(raw.sources),
     rateSource: 'market',
+    // Kapitalbank's buy and sell prices, typed in from the bank's page
+    kapital: cleanKapital(raw.kapital),
+    // which prices of a bank with two of them the converter counts by
+    rateSide: RATE_SIDES.includes(raw.rateSide) ? raw.rateSide : DEFAULT_SIDE,
     shop: cleanShop(raw.shop)
   };
   if (isSourceId(state, raw.rateSource)) state.rateSource = raw.rateSource;
   Object.assign(state, mergeSameNames(state.sources, state.rateSource));
+  adoptOwnKapital(state); // v12: a "Капиталбанк" source of one's own becomes the built-in one
 
   const fromVersion = src ? (Number.isInteger(raw.v) && raw.v > 0 ? raw.v : 1) : STATE_VERSION;
   if (src) migrate(state, fromVersion);
@@ -151,6 +165,7 @@ export function buildState(saved, { language = 'ru', prefersLight = false } = {}
   if (fromVersion < 11 && Array.isArray(raw.customRates)) {
     const converted = sourcesFromPairs(raw.customRates, raw.rateId);
     Object.assign(state, mergeSameNames(converted.sources, converted.rateSource));
+    adoptOwnKapital(state);
   }
   if (!state.list.length) state.list = [...DEFAULT_LIST];
   if (!state.list.includes(state.base)) {

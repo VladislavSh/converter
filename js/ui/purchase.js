@@ -5,12 +5,16 @@ import { formatMoney, formatNumber, plainNumber } from '../core/format.js';
 import { parsePastedAmount, pastedPrice, takeConverterAmount } from '../core/pasted-amount.js';
 import { calcPurchase, parseNumber } from '../core/purchase.js';
 import { breakdownLines, purchaseShareText } from '../core/share-text.js';
-import { clearDelivery } from '../core/state.js';
+import { DEFAULT_SIDE } from '../core/rate-sources.js';
+import { ORDER_CURRENCY, clearDelivery } from '../core/state.js';
 import { $, $$, copyText, escapeHtml, setTicking } from './dom.js';
 
 const MIN_LEFTOVER = 0.004; // below half a cent there is nothing to explain
 
 export function createPurchaseView(app, { keypad }) {
+  // The order is always counted by the default (buy) prices of a bank with two
+  // of them: no switch here, the converter's choice does not apply
+  const convert = (value, from, to) => app.convert(value, from, to, DEFAULT_SIDE);
   const el = {
     price: $('#sh-price'),
     copy: $('#sh-copy'),
@@ -135,7 +139,7 @@ export function createPurchaseView(app, { keypad }) {
       const actual = delivery.kg < 1 ? `${formatNumber(delivery.kg * 1000, locale, 0)} ${t('dlG')}` : kilos(delivery.kg);
       billed += ` <span class="rrow__note">${escapeHtml(t('dlFact', { w: actual }))}</span>`;
     }
-    const inUzs = app.convert(delivery.cost, 'USD', 'UZS');
+    const inUzs = convert(delivery.cost, 'USD', 'UZS');
     // An oversized parcel: its volume, its volumetric weight and whether that is billed
     const volumeRows = [];
     const { volume } = delivery;
@@ -208,8 +212,8 @@ export function createPurchaseView(app, { keypad }) {
     el.copy.hidden = !r.hasTopup;
     el.alt.textContent = r.topupAlt == null ? '' : `≈ ${money(r.topupAlt, r.altCurrency)} ${r.altCurrency}`;
 
-    const usdCny = app.convert(1, 'USD', 'CNY');
-    const cnyUzs = app.convert(1, 'CNY', 'UZS');
+    const usdCny = convert(1, 'USD', 'CNY');
+    const cnyUzs = convert(1, 'CNY', 'UZS');
     el.rates.textContent = [
       usdCny == null ? '' : `1 USD = ${money(usdCny, 'CNY')} CNY`,
       cnyUzs == null ? '' : `1 CNY = ${money(cnyUzs, 'CNY')} UZS`
@@ -295,7 +299,7 @@ export function createPurchaseView(app, { keypad }) {
   function render() {
     const locale = app.locale();
     const money = (value, code) => formatMoney(value, code, locale);
-    const result = calcPurchase(shop(), app.convert);
+    const result = calcPurchase(shop(), convert);
     lastResult = result;
     syncControls();
     renderDelivery(result.delivery, money);
@@ -316,6 +320,11 @@ export function createPurchaseView(app, { keypad }) {
       const clean = sanitizeExpression(input.value);
       if (clean !== input.value) input.value = clean;
       shop()[key] = clean;
+      // A price wiped out is a new order: it starts in yuan again
+      if (key === 'price' && clean === '' && shop().priceCur !== ORDER_CURRENCY) {
+        shop().priceCur = ORDER_CURRENCY;
+        el.currency.value = ORDER_CURRENCY;
+      }
       changed();
     });
   }
@@ -333,7 +342,7 @@ export function createPurchaseView(app, { keypad }) {
   el.dlStep.addEventListener('change', () => { shop().dlStep = el.dlStep.value; changed(); });
 
   // --- pasting a price copied from the shop: "¥1,299.00", "$12.99", "1 500 ₽" ---
-  const hasRate = code => app.convert(1, 'USD', code) != null;
+  const hasRate = code => convert(1, 'USD', code) != null;
 
   /** Shows a price that was put into the form and says where it came from. */
   function showNewPrice(result, sourceValue, plainKey, convertedKey) {
@@ -349,14 +358,18 @@ export function createPurchaseView(app, { keypad }) {
 
   /** Puts a pasted price into the form and says what was understood. */
   function replacePrice(pasted) {
-    const result = pastedPrice(pasted, shop(), app.convert);
+    const result = pastedPrice(pasted, shop(), convert);
+    if (!result) {
+      app.toast(app.t('pastedNoRate', { code: pasted.currency }));
+      return;
+    }
     Object.assign(shop(), { price: result.price, priceCur: result.currency });
     showNewPrice(result, pasted.value, 'pasted', 'pastedConverted');
   }
 
   /** The tab was opened: an amount just typed on the main screen becomes the price. */
   function takeAmount() {
-    const taken = takeConverterAmount(app.state, app.convert);
+    const taken = takeConverterAmount(app.state, convert);
     if (taken) showNewPrice(taken, taken.value, 'carried', 'carriedConverted');
   }
 
@@ -387,10 +400,10 @@ export function createPurchaseView(app, { keypad }) {
   el.share.addEventListener('click', () => {
     const text = lastResult && purchaseShareText({
       result: lastResult,
-      convert: app.convert,
+      convert,
       t: app.t,
       locale: app.locale(),
-      rateNote: app.rateNote(),
+      rateNote: app.rateNote(DEFAULT_SIDE),
       url: app.link()
     });
     if (text) app.share(text);

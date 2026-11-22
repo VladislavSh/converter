@@ -210,12 +210,15 @@ const ALLOWED_HOSTS = [
   RATE_SOURCES.cbu.url, RATE_SOURCES.nbu.url
 ].map(url => new URL(url).host);
 
+// Pages the app only links to (opened by the user in the browser), never requests
+const LINK_ONLY_HOSTS = [new URL(RATE_SOURCES.kapital.page).host];
+
 test('the app talks only to the rate APIs and the two banks', () => {
   const sources = { 'index.html': html, 'sw.js': sw, ...jsSources, ...Object.fromEntries(walk('css').map(f => [f, read(f)])) };
   for (const [file, source] of Object.entries(sources)) {
     for (const match of source.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {
       const host = match[1].toLowerCase();
-      if (host === 'www.w3.org') continue; // SVG namespace, never requested
+      if (host === 'www.w3.org' || LINK_ONLY_HOSTS.includes(host)) continue; // SVG namespace, links: never requested
       assert.ok(ALLOWED_HOSTS.includes(host), `${file} mentions ${host}`);
     }
   }
@@ -258,4 +261,11 @@ test('the stylesheet has balanced braces (one stray "}" drops every rule after i
     }
   }
   assert.equal(depth, 0, 'every "{" is closed');
+});
+
+test('every <div> in the page is closed exactly once', () => {
+  // A stray </div> once pushed the rate form's buttons out of the sheet
+  const opened = (html.match(/<div[\s>]/g) ?? []).length;
+  const closed = (html.match(/<\/div>/g) ?? []).length;
+  assert.equal(closed, opened);
 });

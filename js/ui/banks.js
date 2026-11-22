@@ -1,10 +1,11 @@
 // "Rates" tab: pick a source from the list and see its rates — the market
-// rates, the Central Bank, the National Bank or a source of one's own. One
+// rate, the Central Bank, the National Bank and Kapitalbank (their buy and
+// sell prices side by side) or a source of one's own. One
 // button makes the shown source the one every calculation uses
 // (core/rate-sources.js). The boards are loaded by main.js with the market rates.
 import { RATE_SOURCES } from '../config.js';
 import { shownBankCodes } from '../core/bank-rates.js';
-import { BANK_SOURCES, isSourceId, selectSource, sourceSummary } from '../core/rate-sources.js';
+import { BANK_SOURCES, BUILTIN_SOURCES, KAPITAL, isSourceId, selectSource } from '../core/rate-sources.js';
 import { formatAmount, formatNumber } from '../core/format.js';
 import { currencyName, isKnownFiat } from '../core/names.js';
 import { badgeHtml } from './badge.js';
@@ -43,6 +44,8 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
     return valueRow(entry, `<b>${money(entry.rate)}</b>${diff}`);
   }
 
+  const pairHeader = () => `<li class="bank-row bank-row--pair bank-row--head" aria-hidden="true"><span></span><span class="bank-row__value">${escapeHtml(app.t('bankBuy'))}</span><span class="bank-row__value">${escapeHtml(app.t('bankSell'))}</span></li>`;
+
   function nbuRow(entry) {
     const cell = value => (value == null ? '—' : money(value));
     return `<li class="bank-row bank-row--pair">${nameCell(entry)}
@@ -53,17 +56,7 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
   // ---------- choosing the source: a button and a sheet with the list ----------
 
   /** One line under a source's name: how fresh its rates are, or what is in it. */
-  function noteFor(id) {
-    const { t } = app;
-    if (id === 'market') return t('rateMarketNote');
-    if (BANK_SOURCES.includes(id)) {
-      const board = app.banks[id];
-      if (!board) return t(app.bankStatus[id] === 'loading' ? 'bankLoading' : 'srcNotLoaded');
-      return t(id === 'cbu' ? 'srcCbuNote' : 'srcNbuNote', { date: board.date });
-    }
-    const own = app.state.sources.find(source => source.id === id);
-    return own ? sourceSummary(own, app.locale(), 2) : '';
-  }
+  const noteFor = id => app.sourceNote(id);
 
   function optionHtml(id) {
     const shown = id === shownId();
@@ -86,7 +79,7 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
     const group = key => `<li class="src-group" role="presentation">${escapeHtml(app.t(key))}</li>`;
     const own = app.state.sources.map(source => source.id);
     el.options.innerHTML = [
-      group('srcGroupNet'), ...['market', ...BANK_SOURCES].map(optionHtml),
+      group('srcGroupNet'), ...['market', ...BUILTIN_SOURCES].map(optionHtml),
       ...(own.length ? [group('srcGroupOwn'), ...own.map(optionHtml)] : [])
     ].join('');
   }
@@ -125,10 +118,16 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
         (status === 'failed' ? ` · ${t('bankStale')}` : '');
       const { codes, hidden } = shownBankCodes(board.rates, app.state.list, expanded);
       const entry = code => board.rates.find(item => item.code === code);
-      const header = id === 'nbu'
-        ? `<li class="bank-row bank-row--pair bank-row--head" aria-hidden="true"><span></span><span class="bank-row__value">${escapeHtml(t('bankBuy'))}</span><span class="bank-row__value">${escapeHtml(t('bankSell'))}</span></li>`
-        : '';
+      const header = id === 'nbu' ? pairHeader() : '';
       return { sub, rows: header + codes.map(code => (id === 'cbu' ? cbuRow : nbuRow)(entry(code))).join(''), hidden, link };
+    }
+    if (id === KAPITAL) {
+      const { rates, date } = app.state.kapital;
+      const link = RATE_SOURCES.kapital.page;
+      if (!rates.length) return { sub: t('srcKapitalEmptyLong'), rows: '', hidden: 0, link };
+      const side = value => (value === '' ? null : Number(value));
+      const rows = rates.map(entry => nbuRow({ code: entry.code, nominal: 1, buy: side(entry.buy), sell: side(entry.sell) })).join('');
+      return { sub: date ? t('srcKapitalSub', { date }) : t('srcKapitalNoDate'), rows: pairHeader() + rows, hidden: 0, link };
     }
     const own = app.state.sources.find(source => source.id === id);
     if (!own) return { sub: '', rows: '', hidden: 0 };
@@ -151,7 +150,9 @@ export function createBanksView(app, { onSourceChange, onAddSource, onEditSource
     el.link.hidden = !view.link;
     if (view.link) el.link.href = view.link;
     el.edit.hidden = BANK_SOURCES.includes(id) || id === 'market';
-    el.use.innerHTML = id === app.state.rateSource
+    const kapitalEmpty = id === KAPITAL && !app.state.kapital.rates.length;
+    el.edit.textContent = app.t(id === KAPITAL ? (kapitalEmpty ? 'kapitalEnter' : 'kapitalEdit') : 'srcEdit');
+    el.use.innerHTML = kapitalEmpty ? '' : id === app.state.rateSource
       ? `<span class="bank__use is-on">${ICONS.check}${escapeHtml(app.t('bankInUse'))}</span>`
       : `<button type="button" class="bank__use" data-source="${id}">${escapeHtml(app.t('bankUseAll'))}</button>`;
     el.more.hidden = !expanded && view.hidden === 0;
